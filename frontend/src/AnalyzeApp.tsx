@@ -212,7 +212,6 @@ export default function AnalyzeApp() {
       </nav>
 
       <header className="app-header">
-        <span className="badge">CS2 demo analysis</span>
         <h1>Decision Coach</h1>
         <p className="lead">
           See exactly which decisions cost you the round — and the better play you should have made.
