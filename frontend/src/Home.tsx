@@ -70,7 +70,6 @@ export default function Home() {
       <header className="hero">
         <div className="hero-glow" aria-hidden="true" />
         <div className="hero-inner">
-          <span className="badge">AI coaching · competitive gaming</span>
           <h1 className="hero-title">
             AI coaching built for <span className="grad">every competitive game.</span>
           </h1>

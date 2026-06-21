@@ -9,6 +9,9 @@
   --line: #3a352b;
   --text: #e9e4d6;
   --muted: #9c9484;
+  /* accents */
+  --good: #6f9a6b;
+  --bad: #b0584f;
 
   background:
     /* accent glows (top) */
@@ -218,7 +221,7 @@
 .step-n {
   font-family: ui-monospace, monospace;
   font-size: 0.85rem;
-  color: var(--neon);
+  color: var(--good);
   letter-spacing: 0.1em;
 }
 
@@ -302,7 +305,7 @@
   content: "▸";
   position: absolute;
   left: 16px;
-  color: var(--neon);
+  color: var(--bad);
 }
 
 /* why + cta band */
