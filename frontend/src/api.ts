@@ -1,6 +1,9 @@
 import type { CoachReport, PlayerMemoryResponse } from "./types";
 
-export const API_BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
+// When VITE_BACKEND_URL is undefined (e.g. local `npm run dev`) we fall back to
+// the dev backend. In the Docker/production build it is set to "" so requests go
+// to the same origin and nginx proxies /api + /health to the backend container.
+export const API_BASE = import.meta.env.VITE_BACKEND_URL ?? "http://localhost:8000";
 
 async function handle<T>(res: Response): Promise<T> {
   if (!res.ok) {

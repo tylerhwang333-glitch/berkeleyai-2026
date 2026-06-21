@@ -1,12 +1,33 @@
-services:
-  redis:
-    image: redis/redis-stack:latest
-    container_name: cs2coach-redis
-    ports:
-      - "6379:6379"   # Redis
-      - "8001:8001"   # RedisInsight UI
-    volumes:
-      - redis_data:/data
+# CS2 Decision Coach — cloud deployment.
+#
+# Redis is the managed cloud instance from .env (REDIS_URL=rediss://...), so no
+# local redis service is started here. The backend talks to cloud Redis; the
+# frontend (nginx) serves the built SPA and proxies /api + /health to the backend.
 
-volumes:
-  redis_data:
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: cs2coach-backend
+    # Reads REDIS_URL, REDIS_REQUIRED, ANTHROPIC_API_KEY, ANTHROPIC_MODEL,
+    # USE_MOCK_DEM_PARSER from the repo-root .env.
+    env_file:
+      - .env
+    expose:
+      - "8000"
+    ports:
+      - "8000:8000"   # optional: direct backend access for debugging
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Empty => same-origin; nginx proxies /api to the backend service.
+        VITE_BACKEND_URL: ""
+    container_name: cs2coach-frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+    restart: unless-stopped

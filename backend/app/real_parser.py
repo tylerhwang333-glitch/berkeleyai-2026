@@ -213,19 +213,39 @@ class RealDemParser:
         target_steamid = self._resolve_target(players)
         self.analyzed_player_name = players[target_steamid]
 
-        rounds_meta = self._load_rounds(parser)
+        # Decode EVERY game event we need in a SINGLE pass over the demo.
+        # demoparser2 re-reads and fully re-decodes the entire (100-300 MB) file
+        # on every parse_event() call, so loading rounds/deaths/blinds/bombs/
+        # detonations one event at a time meant ~11 full decodes per upload. On a
+        # real match that is slow enough to blow past the proxy read timeout AND
+        # churns enough memory to risk an OOM kill — both of which drop the
+        # connection and surface to the client as a 502. One parse_events() call
+        # decodes once and hands back every event we asked for.
+        event_names = [
+            "round_start",
+            "round_end",
+            "round_officially_ended",
+            "round_freeze_end",
+            "player_death",
+            "player_blind",
+            "bomb_planted",
+            "bomb_dropped",
+            *DETONATE_EVENTS.keys(),
+        ]
+        events = self._parse_all_events(parser, event_names)
+
+        rounds_meta = self._load_rounds(events)
         if not rounds_meta:
-            diag = self._round_diagnostics(parser)
+            diag = self._round_diagnostics(events)
             raise DemoParseError(
                 f"No rounds found in demo (incomplete recording?). {diag}"
             )
 
-        # Bulk-load the events once; slice per round below.
-        deaths = self._event_df(parser, "player_death")
-        blinds = self._event_df(parser, "player_blind")
-        bombs = self._event_df(parser, "bomb_planted")
-        drops = self._event_df(parser, "bomb_dropped")
-        detonations = self._load_detonations(parser)
+        deaths = events.get("player_death")
+        blinds = events.get("player_blind")
+        bombs = events.get("bomb_planted")
+        drops = events.get("bomb_dropped")
+        detonations = self._load_detonations(events)
 
         # Per-second timeline of every player's position + zone + alive state.
         timeline = self._load_timeline(parser, rounds_meta)
@@ -328,11 +348,38 @@ class RealDemParser:
             return None
         return df
 
-    def _load_detonations(self, parser) -> List[dict]:
+    def _parse_all_events(self, parser, names: List[str]) -> Dict[str, object]:
+        """Decode every requested game event in ONE pass over the demo.
+
+        Returns {event_name -> DataFrame} for events that actually occurred
+        (empty/absent events are omitted, so callers use ``.get(name)`` and treat
+        a missing key like the old ``_event_df`` ``None``). Falls back to one
+        decode per event if the bulk call rejects an event name this demo never
+        recorded — slower, but it never loses a round over a single odd event.
+        """
+        try:
+            pairs = parser.parse_events(list(names))
+        except BaseException as exc:  # noqa: BLE001 — pyo3 panics subclass BaseException
+            if isinstance(exc, (KeyboardInterrupt, SystemExit)):
+                raise
+            out: Dict[str, object] = {}
+            for name in names:
+                df = self._event_df(parser, name)
+                if df is not None:
+                    out[name] = df
+            return out
+        out = {}
+        for name, df in pairs:
+            if df is None or not hasattr(df, "columns") or len(df) == 0:
+                continue
+            out[name] = df
+        return out
+
+    def _load_detonations(self, events: Dict[str, object]) -> List[dict]:
         """All utility detonations as {tick, steamid, x, y, z, util}."""
         out: List[dict] = []
         for ev, util in DETONATE_EVENTS.items():
-            df = self._event_df(parser, ev)
+            df = events.get(ev)
             if df is None:
                 continue
             for _, row in df.iterrows():
@@ -349,16 +396,16 @@ class RealDemParser:
         out.sort(key=lambda d: d["tick"])
         return out
 
-    def _load_rounds(self, parser) -> List[dict]:
+    def _load_rounds(self, events: Dict[str, object]) -> List[dict]:
         """Build [{number, start_tick, t0_tick, end_tick, winner_team}] per round.
 
         t0_tick is the freeze-end (live round start) used as the zero point for
         round-relative timestamps, matching how the sample fixture reads.
         """
-        starts = self._event_df(parser, "round_start")
-        ends = self._event_df(parser, "round_end")
-        official = self._event_df(parser, "round_officially_ended")
-        freeze = self._event_df(parser, "round_freeze_end")
+        starts = events.get("round_start")
+        ends = events.get("round_end")
+        official = events.get("round_officially_ended")
+        freeze = events.get("round_freeze_end")
         if starts is None:
             return []
 
@@ -413,10 +460,10 @@ class RealDemParser:
             )
         return rounds
 
-    def _round_diagnostics(self, parser) -> str:
+    def _round_diagnostics(self, events: Dict[str, object]) -> str:
         """Human-readable counts to explain why no rounds were reconstructed."""
         def count(name: str) -> int:
-            df = self._event_df(parser, name)
+            df = events.get(name)
             return 0 if df is None else len(df)
 
         return (

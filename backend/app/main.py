@@ -6,10 +6,12 @@ Pipeline:
 from __future__ import annotations
 
 import os
+import shutil
 import tempfile
+import threading
 import uuid
 from pathlib import Path
-from typing import List
+from typing import BinaryIO, List
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -48,16 +50,26 @@ _ASSETS_DIR = Path(__file__).resolve().parents[2] / "public" / "assets"
 if _ASSETS_DIR.is_dir():
     app.mount("/assets", StaticFiles(directory=str(_ASSETS_DIR)), name="assets")
 
-# Single shared Redis client; may be None if Redis is unreachable.
-_redis = redis_store.connect_redis()
+# Single shared Redis client; may be None if Redis is unreachable. Connected in
+# a startup background thread (NOT at import) so a slow/dead Redis can never delay
+# uvicorn binding the port — otherwise the connect retries run before the socket
+# is listening and nginx returns 502 for the whole startup window.
+_redis = None
+
+
+def _connect_redis_async() -> None:
+    global _redis
+    client = redis_store.connect_redis()
+    if client is not None:
+        redis_store.ensure_indexes(client)
+        _redis = client
 
 
 @app.on_event("startup")
 def _startup() -> None:
-    global _redis
-    if _redis is None:
-        _redis = redis_store.connect_redis()
-    redis_store.ensure_indexes(_redis)
+    # Daemon thread: the API serves immediately (memory features switch on once
+    # Redis connects). If Redis is down the app keeps working without memory.
+    threading.Thread(target=_connect_redis_async, daemon=True).start()
 
 
 # ---------------------------------------------------------------------------
@@ -153,7 +165,7 @@ def analyze_sample(req: AnalyzeSampleRequest) -> CoachReport:
 
 
 @app.post("/api/analyze/upload", response_model=CoachReport)
-async def analyze_upload(
+def analyze_upload(
     file: UploadFile = File(...),
     player_id: str = Form("local_user"),
     player_name: str = Form(""),
@@ -164,20 +176,26 @@ async def analyze_upload(
     * ``.dem``  -> decoded for real via demoparser2 (RealDemParser). Pass
       ``player_name`` to choose which player in the demo to coach; otherwise the
       first player is analyzed.
+
+    Defined as a SYNC ``def`` on purpose: decoding a real .dem is heavy, blocking
+    native (Rust/pyo3) work, and ``_run_pipeline`` makes blocking Redis/Anthropic
+    calls. A sync endpoint runs in FastAPI's threadpool, so it never freezes the
+    event loop — health checks keep responding and one big upload can't wedge the
+    whole worker (which otherwise surfaces to the client as a 502).
     """
     player_id = player_id or "local_user"
     player_name = (player_name or "").strip()
     filename = file.filename or "upload"
-    contents = await file.read()
     lower = filename.lower()
 
     if lower.endswith(".json"):
+        contents = file.file.read()
         try:
             demo = JsonUploadParser(contents, player_id=player_id).parse()
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(status_code=400, detail=f"Could not parse uploaded JSON as a parsed demo: {exc}")
     elif lower.endswith(".dem"):
-        demo = _parse_dem_upload(contents, filename, player_id, player_name)
+        demo = _parse_dem_upload(file.file, filename, player_id, player_name)
     else:
         raise HTTPException(
             status_code=400,
@@ -187,14 +205,20 @@ async def analyze_upload(
     return _run_pipeline(demo)
 
 
-def _parse_dem_upload(contents: bytes, filename: str, player_id: str, player_name: str) -> ParsedDemo:
-    """Persist the uploaded bytes to a temp .dem and decode it."""
-    if not contents:
-        raise HTTPException(status_code=400, detail="Uploaded .dem file is empty.")
+def _parse_dem_upload(src: BinaryIO, filename: str, player_id: str, player_name: str) -> ParsedDemo:
+    """Stream the uploaded demo to a temp .dem and decode it.
 
+    ``src`` is the SpooledTemporaryFile behind the UploadFile. We copy it to a
+    temp file in chunks instead of reading the whole (often 100-300 MB) demo into
+    a single bytes object, which keeps peak memory low and avoids OOM-killing the
+    worker on a memory-constrained instance.
+    """
     # CS2 (Source 2) demos start with the magic "PBDEMS2"; CS:GO demos with
-    # "HL2DEMO". Reject obvious non-demos before invoking the native parser.
-    if not contents[:8].startswith((b"PBDEMS2", b"HL2DEMO")):
+    # "HL2DEMO". Reject obvious non-demos before touching disk / the native parser.
+    head = src.read(8)
+    if not head:
+        raise HTTPException(status_code=400, detail="Uploaded .dem file is empty.")
+    if not head.startswith((b"PBDEMS2", b"HL2DEMO")):
         raise HTTPException(
             status_code=400,
             detail="That file is not a CS2 demo (missing PBDEMS2 header). Upload a real .dem.",
@@ -206,7 +230,8 @@ def _parse_dem_upload(contents: bytes, filename: str, player_id: str, player_nam
     tmp_path = None
     try:
         with tempfile.NamedTemporaryFile(suffix=".dem", delete=False) as tmp:
-            tmp.write(contents)
+            tmp.write(head)
+            shutil.copyfileobj(src, tmp, length=1024 * 1024)  # stream rest in 1 MB chunks
             tmp_path = tmp.name
         safe_name = filename.rsplit("/", 1)[-1].replace(".dem", "") or "uploaded_demo"
         parser = RealDemParser(

@@ -51,7 +51,13 @@ def connect_redis(retries: int = 5, backoff: float = 0.5) -> Optional["redis.Red
     for attempt in range(1, retries + 1):
         try:
             client = redis.Redis.from_url(
-                REDIS_URL, decode_responses=False, socket_connect_timeout=3
+                REDIS_URL,
+                decode_responses=False,
+                socket_connect_timeout=3,
+                # Read timeout too: this endpoint can accept the TCP connection
+                # but then hang on the AUTH/PING reply. Without this the ping()
+                # blocks for ~6s/attempt and startup drags for 30s+.
+                socket_timeout=3,
             )
             client.ping()
             if attempt > 1:
