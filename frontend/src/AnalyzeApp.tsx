@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { analyzeSample, analyzeUpload, getHealth, getPlayerMemory } from "./api";
+import { analyzeUpload, getHealth, getPlayerMemory } from "./api";
 import type { CoachReport, DecisionMoment } from "./types";
 import { MapLegend, RoundMap, mappableRounds } from "./MapView";
 
@@ -240,17 +240,6 @@ export default function AnalyzeApp() {
           />
         </div>
 
-        <div className="row">
-          <button className="btn primary" disabled={loading} onClick={() => run(() => analyzeSample(playerId))}>
-            Analyze Sample Demo
-          </button>
-          <button className="btn ghost" disabled={loading} onClick={loadMemory}>
-            View Saved Patterns
-          </button>
-        </div>
-
-        <div className="divider" />
-
         <div className="field">
           <label htmlFor="demoFile">Upload a CS2 demo (.dem) or parsed .json</label>
           <input
@@ -272,13 +261,18 @@ export default function AnalyzeApp() {
           />
         </div>
         <p className="hint">.dem files are parsed with demoparser2. No name given? We analyze the first player.</p>
-        <button
-          className="btn primary"
-          disabled={loading || !file}
-          onClick={() => file && run(() => analyzeUpload(file, playerId, playerName))}
-        >
-          Upload &amp; Analyze
-        </button>
+        <div className="row">
+          <button
+            className="btn primary"
+            disabled={loading || !file}
+            onClick={() => file && run(() => analyzeUpload(file, playerId, playerName))}
+          >
+            Upload &amp; Analyze
+          </button>
+          <button className="btn ghost" disabled={loading} onClick={loadMemory}>
+            View Saved Patterns
+          </button>
+        </div>
       </section>
 
       {loading && (
