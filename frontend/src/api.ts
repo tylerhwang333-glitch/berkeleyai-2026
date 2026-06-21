@@ -1,6 +1,6 @@
 import type { CoachReport, PlayerMemoryResponse } from "./types";
 
-const API_BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
+export const API_BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
 async function handle<T>(res: Response): Promise<T> {
   if (!res.ok) {

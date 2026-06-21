@@ -27,8 +27,16 @@ import math
 from collections import Counter
 from typing import Dict, List, Optional, Tuple
 
-from .map_zones import UNKNOWN_ZONE, resolve_zone
-from .models import GameEvent, ParsedDemo, PlayerRoundSummary, RoundFacts
+from .map_zones import UNKNOWN_ZONE, resolve_zone, world_to_normalized
+from .models import (
+    BombState,
+    EntityPosition,
+    EventSnapshot,
+    GameEvent,
+    ParsedDemo,
+    PlayerRoundSummary,
+    RoundFacts,
+)
 
 # CS2 competitive demos record 64 ticks/second. demoparser2 does not surface a
 # tickrate, and 64 is correct for MM/FACEIT/Valve official demos.
@@ -63,6 +71,19 @@ TIMELINE_STEP_TICKS = int(TICK_RATE)
 
 # How recently a friendly flash must have blinded an enemy to count as "support".
 FLASH_SUPPORT_WINDOW_S = 3.0
+
+# How long (seconds) a detonated utility stays "active" on the map, so an event's
+# snapshot shows the smokes/fires that are actually up at that tick. Smokes/fires
+# persist; HE/flash are effectively instantaneous (shown briefly around impact).
+UTIL_LIFETIME_S = {
+    "smoke": 18.0,
+    "molotov": 7.0,
+    "he": 1.0,
+    "flash": 1.0,
+}
+
+# Team-number -> side label for snapshot entities.
+TEAM_SIDE = {TEAM_T: "T", TEAM_CT: "CT"}
 
 
 class DemoParseError(Exception):
@@ -118,6 +139,25 @@ def _isnum(val) -> bool:
     return not math.isnan(f)
 
 
+def _winner_team(val) -> int:
+    """Normalize a round_end ``winner`` to a team number (2=T / 3=CT), else -1.
+
+    demoparser2 reports the winner as a SIDE STRING ("T"/"CT") on CS2 demos, not
+    a team number, so the old numeric-only parse left every round "unknown".
+    Accept both forms (and numeric strings) to be robust across demo versions.
+    """
+    if _isnum(val):
+        n = _i(val, -1)
+        return n if n in (TEAM_T, TEAM_CT) else -1
+    if isinstance(val, str):
+        s = val.strip().lower()
+        if s in ("t", "ts", "terrorist", "terrorists"):
+            return TEAM_T
+        if s in ("ct", "cts", "counter-terrorist", "counter-terrorists", "counterterrorist"):
+            return TEAM_CT
+    return -1
+
+
 def _dist(a: Tuple[float, float, float], b: Tuple[float, float, float]) -> float:
     return math.sqrt(
         (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2
@@ -139,6 +179,7 @@ class RealDemParser:
         self.player_name = player_name
         self.demo_id = demo_id
         self.analyzed_player_name: Optional[str] = None
+        self.players: Dict[str, str] = {}
 
     # -- public ----------------------------------------------------------------
     def parse(self) -> ParsedDemo:
@@ -168,6 +209,7 @@ class RealDemParser:
         players = self._load_players(parser)
         if not players:
             raise DemoParseError("No players found in demo.")
+        self.players = players
         target_steamid = self._resolve_target(players)
         self.analyzed_player_name = players[target_steamid]
 
@@ -182,15 +224,25 @@ class RealDemParser:
         deaths = self._event_df(parser, "player_death")
         blinds = self._event_df(parser, "player_blind")
         bombs = self._event_df(parser, "bomb_planted")
+        drops = self._event_df(parser, "bomb_dropped")
         detonations = self._load_detonations(parser)
 
         # Per-second timeline of every player's position + zone + alive state.
         timeline = self._load_timeline(parser, rounds_meta)
-        # Exact-death-tick positions for precise distance-to-teammate.
+        # Exact positions/inventory at every event tick (deaths + utility
+        # detonations + bomb plants). This both keeps death distance/inventory
+        # exact AND lets each event carry a full snapshot of where everyone (and
+        # every util) was at that tick.
         death_ticks = (
             [_i(t) for t in deaths["tick"].dropna().tolist()] if deaths is not None else []
         )
-        death_positions = self._positions_at(parser, death_ticks)
+        event_ticks = set(death_ticks)
+        event_ticks.update(d["tick"] for d in detonations)
+        if bombs is not None:
+            event_ticks.update(
+                _i(b["tick"]) for _, b in bombs.iterrows() if _isnum(b.get("tick"))
+            )
+        death_positions = self._positions_at(parser, sorted(event_ticks))
 
         team_by_round = self._teams_per_round(timeline, target_steamid, rounds_meta)
 
@@ -206,6 +258,7 @@ class RealDemParser:
                 deaths=deaths,
                 blinds=blinds,
                 bombs=bombs,
+                drops=drops,
                 detonations=detonations,
                 timeline=timeline,
                 death_positions=death_positions,
@@ -315,7 +368,7 @@ class RealDemParser:
         # rows would throw away real rounds. Unknown winner -> -1.
         end_rows = sorted(
             (
-                {"tick": _i(r["tick"]), "winner": _i(r["winner"], -1) if _isnum(r.get("winner")) else -1}
+                {"tick": _i(r["tick"]), "winner": _winner_team(r.get("winner"))}
                 for _, r in ends.iterrows()
                 if _isnum(r.get("tick"))
             ),
@@ -469,6 +522,7 @@ class RealDemParser:
         deaths,
         blinds,
         bombs,
+        drops,
         detonations: List[dict],
         timeline: Dict[int, List[dict]],
         death_positions: Dict[int, List[dict]],
@@ -535,16 +589,21 @@ class RealDemParser:
             events.append(
                 GameEvent(
                     timestamp_seconds=secs(det["tick"]),
+                    tick=det["tick"],
                     event_type=det["util"],
                     actor=actor,
                     location=location,
                     zone=zone,
                     description=f"{actor.title()} {det['util']} at {location or 'unknown'}",
+                    snapshot=self._snapshot_at(
+                        det["tick"], map_name, target, detonations, death_positions, timeline
+                    ),
                 )
             )
 
         bomb_plant_secs: Optional[float] = None
         bombsite: Optional[str] = None
+        bomb: Optional[BombState] = None
         if bombs is not None:
             for _, b in bombs.iterrows():
                 if not _isnum(b.get("tick")):
@@ -558,15 +617,43 @@ class RealDemParser:
                 region = _to_region(place)
                 bombsite = region or place or None
                 bomb_plant_secs = secs(btick)
+                # Plant location (planter's position) -> canonical zone + radar xy.
+                ppos = self._pos_of(planter, btick, death_positions, timeline)
+                plant_zone = resolve_zone(
+                    map_name,
+                    ppos[0] if ppos else None,
+                    ppos[1] if ppos else None,
+                    ppos[2] if ppos else None,
+                    place=place,
+                )
+                pnx, pny = (
+                    world_to_normalized(map_name, ppos[0], ppos[1]) if ppos else (None, None)
+                )
+                site_label = plant_zone if plant_zone != UNKNOWN_ZONE else (region or place or None)
+                bomb = BombState(status="planted", site=site_label, tick=btick, nx=pnx, ny=pny)
                 events.append(
                     GameEvent(
                         timestamp_seconds=bomb_plant_secs,
+                        tick=btick,
                         event_type="bomb_plant",
                         actor=actor,
                         location=place,
-                        description=f"Bomb planted at {place or 'site'}",
+                        zone=plant_zone if plant_zone != UNKNOWN_ZONE else None,
+                        description=f"Bomb planted at {site_label or 'site'}",
+                        snapshot=self._snapshot_at(
+                            btick, map_name, target, detonations, death_positions, timeline
+                        ),
                     )
                 )
+
+        # No plant this round: was the bomb at least dropped (carrier died /
+        # threw it), or never moved off spawn? Used for the map's bomb status.
+        if bomb is None:
+            dropped = drops is not None and any(
+                _isnum(r.get("tick")) and in_round(_i(r["tick"]))
+                for _, r in drops.iterrows()
+            )
+            bomb = BombState(status="dropped" if dropped else "not_planted")
 
         # ---- the analyzed player's death this round --------------------------
         death = self._player_death(deaths, target, in_round)
@@ -592,11 +679,17 @@ class RealDemParser:
             events.append(
                 GameEvent(
                     timestamp_seconds=death_time or 0.0,
+                    tick=death_tick,
                     event_type="death",
                     actor="player",
                     location=death_place or "",
                     zone=death_zone,
                     description=f"Player died to {death.get('attacker_name', 'enemy')} ({death.get('weapon', '?')})",
+                    snapshot=self._snapshot_at(
+                        death_tick, map_name, target, detonations, death_positions, timeline
+                    )
+                    if death_tick is not None
+                    else None,
                 )
             )
         events.sort(key=lambda e: e.timestamp_seconds)
@@ -644,9 +737,72 @@ class RealDemParser:
             player_team=player_team,
             round_winner=round_winner,
             bombsite=bombsite,
+            bomb=bomb,
             events=events,
             player_summary=summary,
         )
+
+    # -- per-event map snapshot ------------------------------------------------
+    def _snapshot_at(
+        self,
+        tick: int,
+        map_name: str,
+        target: str,
+        detonations: List[dict],
+        exact_positions: Dict[int, List[dict]],
+        timeline: Dict[int, List[dict]],
+    ) -> EventSnapshot:
+        """Positions of every player + every active util at ``tick``.
+
+        Player coordinates come from the exact event-tick positions (falling back
+        to the nearest sampled timeline tick); utils are the detonations whose
+        effect is still up at this tick. World coords are scaled to radar
+        fractions (nx/ny) so the client can render them at any image size.
+        """
+        snaps = exact_positions.get(tick)
+        if not snaps:
+            nearest = min(timeline, key=lambda t: abs(t - tick), default=None)
+            snaps = timeline.get(nearest, []) if nearest is not None else []
+
+        players: List[EntityPosition] = []
+        for s in snaps:
+            nx, ny = world_to_normalized(map_name, s["x"], s["y"])
+            players.append(
+                EntityPosition(
+                    kind="player",
+                    label=self.players.get(s["steamid"], "player"),
+                    team=TEAM_SIDE.get(s["team"]),
+                    alive=bool(s.get("alive")),
+                    is_analyzed_player=(s["steamid"] == target),
+                    x=s["x"],
+                    y=s["y"],
+                    z=s["z"],
+                    nx=nx,
+                    ny=ny,
+                )
+            )
+
+        utils: List[EntityPosition] = []
+        for det in detonations:
+            life = UTIL_LIFETIME_S.get(det["util"], 1.0)
+            if not (det["tick"] <= tick <= det["tick"] + life * TICK_RATE):
+                continue
+            team = self._team_of(det["steamid"], det["tick"], exact_positions, timeline)
+            nx, ny = world_to_normalized(map_name, det["x"], det["y"])
+            utils.append(
+                EntityPosition(
+                    kind="util",
+                    label=det["util"],
+                    util_type=det["util"],
+                    team=TEAM_SIDE.get(team) if team is not None else None,
+                    x=det["x"],
+                    y=det["y"],
+                    z=det["z"],
+                    nx=nx,
+                    ny=ny,
+                )
+            )
+        return EventSnapshot(players=players, utils=utils)
 
     # -- fine-grained reconstruction helpers ----------------------------------
     def _player_death(self, deaths, target: str, in_round) -> Optional[dict]:

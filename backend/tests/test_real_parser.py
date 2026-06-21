@@ -17,7 +17,15 @@ import sys
 # Allow `python backend/tests/test_real_parser.py` from the repo root.
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from app.real_parser import RealDemParser, _f, _i, _to_region  # noqa: E402
+from app.real_parser import (  # noqa: E402
+    RealDemParser,
+    TEAM_CT,
+    TEAM_T,
+    _f,
+    _i,
+    _to_region,
+    _winner_team,
+)
 from app import map_zones  # noqa: E402
 
 
@@ -162,6 +170,19 @@ def test_numeric_coercion_handles_nan_and_none():
     assert _i(None, default=7) == 7
 
 
+def test_winner_team_accepts_side_strings_and_numbers():
+    # The real bug: demoparser2 reports the winner as a side STRING, which the
+    # old numeric-only parse turned into -1 ("unknown") for every round.
+    assert _winner_team("CT") == TEAM_CT
+    assert _winner_team("t") == TEAM_T
+    assert _winner_team("TERRORIST") == TEAM_T
+    assert _winner_team("Counter-Terrorist") == TEAM_CT
+    assert _winner_team(3) == TEAM_CT and _winner_team(2) == TEAM_T
+    assert _winner_team("garbage") == -1
+    assert _winner_team(None) == -1
+    assert _winner_team(float("nan")) == -1
+
+
 def test_region_mapping():
     assert _to_region("BombsiteA") == "A"
     assert _to_region("BombsiteB") == "B"
@@ -171,6 +192,62 @@ def test_region_mapping():
     assert _to_region("Palace") == "A"
     assert _to_region(None) is None
     assert _to_region("CTSpawn") is None
+
+
+# ---------------------------------------------------------------------------
+# Radar coordinate scaling + per-event position snapshots
+# ---------------------------------------------------------------------------
+def test_world_to_normalized_scales_into_unit_square():
+    # de_mirage calibration: pos_x=-3230, pos_y=1713, scale=5, size=1024.
+    nx, ny = map_zones.world_to_normalized("de_mirage", -3230.0, 1713.0)
+    assert abs(nx - 0.0) < 1e-9 and abs(ny - 0.0) < 1e-9  # top-left corner
+    nx, ny = map_zones.world_to_normalized("mirage", -1000.0, 0.0)  # de_ optional
+    assert 0.0 <= nx <= 1.0 and 0.0 <= ny <= 1.0
+    # Unsupported / missing -> (None, None), never raises.
+    assert map_zones.world_to_normalized("de_dust2", 0.0, 0.0) == (None, None)
+    assert map_zones.world_to_normalized("de_mirage", None, 0.0) == (None, None)
+
+
+def test_radar_descriptor_is_none_for_unknown_maps():
+    r = map_zones.radar_descriptor("de_mirage")
+    assert r is not None and r.image_url.endswith("De_mirage_radar.jpeg")
+    assert r.image_url.startswith("/assets/")
+    assert map_zones.radar_descriptor("de_nuke") is None
+
+
+def test_snapshot_at_places_players_and_active_utils():
+    from app.real_parser import TEAM_CT, TEAM_T, TICK_RATE
+
+    p = RealDemParser("x.dem")
+    p.players = {"1": "Alice", "2": "Bob", "3": "Enemy"}
+    exact = {
+        1000: [
+            {"steamid": "1", "x": -1000, "y": 0, "z": 0, "team": TEAM_T, "place": "Mid", "alive": True},
+            {"steamid": "2", "x": -500, "y": 500, "z": 0, "team": TEAM_T, "place": "A", "alive": False},
+            {"steamid": "3", "x": 1000, "y": -500, "z": 0, "team": TEAM_CT, "place": "B", "alive": True},
+        ]
+    }
+    detonations = [
+        {"tick": 990, "steamid": "3", "x": 800, "y": -400, "z": 0, "util": "smoke"},   # active
+        {"tick": 100, "steamid": "3", "x": 0, "y": 0, "z": 0, "util": "flash"},        # expired
+        {"tick": 1000, "steamid": "1", "x": -900, "y": 50, "z": 0, "util": "he"},      # active now
+    ]
+    snap = p._snapshot_at(1000, "de_mirage", "1", detonations, exact, {})
+
+    assert len(snap.players) == 3
+    me = next(e for e in snap.players if e.is_analyzed_player)
+    assert me.label == "Alice" and me.team == "T" and me.alive is True
+    assert me.nx is not None and 0.0 <= me.nx <= 1.0
+    dead = next(e for e in snap.players if e.label == "Bob")
+    assert dead.alive is False
+    # Smoke (within 18s) and HE (this tick) stay; the long-expired flash drops.
+    util_types = sorted(u.util_type for u in snap.utils)
+    assert util_types == ["he", "smoke"]
+    smoke = next(u for u in snap.utils if u.util_type == "smoke")
+    assert smoke.team == "CT"  # resolved from the detonator's team
+    # Lifetime boundary: smoke detonated at 990 is gone well after 18s.
+    later = p._snapshot_at(990 + int(19 * TICK_RATE), "de_mirage", "1", detonations, exact, {})
+    assert all(u.util_type != "smoke" for u in later.utils)
 
 
 def test_target_resolution_prefers_name_match():

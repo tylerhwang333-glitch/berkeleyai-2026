@@ -24,6 +24,24 @@ from typing import Dict, List, Tuple
 
 MAP_NAME = "de_mirage"
 
+# Radar image + world->image calibration for overlaying positions.
+#   image: filename under public/assets (served by the backend at /assets).
+#   pos_x/pos_y: world coords of the radar image's top-left corner.
+#   scale: world units per radar pixel.
+#   size:  radar resolution (px) the calibration was authored against.
+# A world point maps to the image via:
+#   nx = (x - pos_x) / (scale * size);  ny = (pos_y - y) / (scale * size)
+# These are the standard de_mirage SimpleRadar values for a 1024px radar; the
+# bundled De_mirage_radar.jpeg is 1024x1024. To add another map, drop its radar
+# image in public/assets and add a RADAR block to that map's map_data module.
+RADAR: Dict[str, object] = {
+    "image": "De_mirage_radar.jpeg",
+    "pos_x": -3230.0,
+    "pos_y": 1713.0,
+    "scale": 5.0,
+    "size": 1024.0,
+}
+
 # The ONLY zone labels the resolver may emit for Mirage (besides "Unknown").
 # Keep this list broad and stable -- it is what the coach prompt is pinned to.
 CANONICAL_ZONES: List[str] = [

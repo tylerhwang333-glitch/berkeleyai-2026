@@ -19,6 +19,67 @@ export interface DecisionMoment {
   summary_text: string;
 }
 
+// One player or piece of utility on the map at a single tick. nx/ny are a 0..1
+// fraction of the radar image (scaled on the backend), so the client just
+// multiplies them by the rendered image size.
+export interface EntityPosition {
+  kind: "player" | "util";
+  label: string;
+  team?: string | null; // "T" | "CT" | null
+  alive?: boolean | null;
+  is_analyzed_player: boolean;
+  util_type?: string | null;
+  x: number;
+  y: number;
+  z: number;
+  nx?: number | null;
+  ny?: number | null;
+}
+
+export interface EventSnapshot {
+  players: EntityPosition[];
+  utils: EntityPosition[];
+}
+
+export interface GameEvent {
+  timestamp_seconds: number;
+  tick?: number | null;
+  event_type: string;
+  actor: string;
+  target?: string | null;
+  location?: string | null;
+  zone?: string | null;
+  description: string;
+  snapshot?: EventSnapshot | null;
+}
+
+export interface BombState {
+  status: "planted" | "dropped" | "not_planted";
+  site?: string | null;
+  tick?: number | null;
+  nx?: number | null;
+  ny?: number | null;
+}
+
+export interface RoundView {
+  round_id: string;
+  round_number: number;
+  side: string;
+  round_winner: string;
+  bombsite?: string | null;
+  bomb?: BombState | null;
+  events: GameEvent[];
+}
+
+export interface MapRadar {
+  map: string;
+  image_url: string;
+  pos_x: number;
+  pos_y: number;
+  scale: number;
+  size: number;
+}
+
 export interface SimilarMemoryItem {
   moment_id: string;
   mistake_type: string;
@@ -38,6 +99,8 @@ export interface CoachReport {
   similar_memory: SimilarMemoryItem[];
   final_coaching_summary: string;
   drills: string[];
+  map_radar?: MapRadar | null;
+  rounds: RoundView[];
 }
 
 export interface PlayerMemoryResponse {
