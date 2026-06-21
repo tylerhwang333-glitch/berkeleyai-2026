@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { analyzeSample, analyzeUpload, getPlayerMemory } from "./api";
 import type { CoachReport, DecisionMoment } from "./types";
+import { MapLegend, RoundMap, mappableRounds } from "./MapView";
 
 const PARSER_MODE_LABELS: Record<string, string> = {
   sample_fixture: "Sample fixture",
@@ -106,6 +107,40 @@ function MomentCard({ m }: { m: DecisionMoment }) {
         </details>
       )}
     </article>
+  );
+}
+
+// Criticized rounds, interleaved with each round's event map: the round's map
+// is rendered immediately before that round's decision-moment card(s).
+function CriticizedRounds({ report }: { report: CoachReport }) {
+  const mapped = mappableRounds(report);
+  const radar = report.map_radar ?? null;
+
+  // Group moments by round, preserving the order they appear in the report.
+  const order: string[] = [];
+  const byRound: Record<string, DecisionMoment[]> = {};
+  for (const m of report.moments) {
+    if (!byRound[m.round_id]) {
+      byRound[m.round_id] = [];
+      order.push(m.round_id);
+    }
+    byRound[m.round_id].push(m);
+  }
+
+  const anyMap = !!radar && order.some((rid) => mapped.has(rid));
+
+  return (
+    <>
+      {anyMap && <MapLegend />}
+      {order.map((rid) => (
+        <div className="round-block" key={rid}>
+          {radar && mapped.has(rid) && <RoundMap round={mapped.get(rid)!} radar={radar} />}
+          {byRound[rid].map((m) => (
+            <MomentCard key={m.moment_id} m={m} />
+          ))}
+        </div>
+      ))}
+    </>
   );
 }
 
@@ -246,12 +281,11 @@ export default function AnalyzeApp() {
             <h2>Criticized rounds</h2>
             <span className="count-pill">{report.moments.length}</span>
           </div>
-          {report.moments.length === 0 && (
+          {report.moments.length === 0 ? (
             <div className="card empty">No decision mistakes detected in this demo. Clean round.</div>
+          ) : (
+            <CriticizedRounds report={report} />
           )}
-          {report.moments.map((m) => (
-            <MomentCard key={m.moment_id} m={m} />
-          ))}
 
           <div className="section-head">
             <h2>Practice focus</h2>

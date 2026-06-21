@@ -8,14 +8,23 @@ from __future__ import annotations
 import os
 import tempfile
 import uuid
+from pathlib import Path
 from typing import List
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from . import arize_tracing, coach, map_zones, redis_store
 from .detectors import run_detectors
-from .models import AnalyzeSampleRequest, CoachReport, DecisionMoment, ParsedDemo, SimilarMemoryItem
+from .models import (
+    AnalyzeSampleRequest,
+    CoachReport,
+    DecisionMoment,
+    ParsedDemo,
+    RoundView,
+    SimilarMemoryItem,
+)
 from .parser import JsonUploadParser, MockDemParser, SampleFixtureParser
 from .real_parser import DemoParseError, RealDemParser
 
@@ -31,6 +40,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Serve map radar images (and any other static assets) from the repo's
+# public/assets directory so the frontend can render them at /assets/<file>.
+# Path: backend/app/main.py -> parents[2] == repo root.
+_ASSETS_DIR = Path(__file__).resolve().parents[2] / "public" / "assets"
+if _ASSETS_DIR.is_dir():
+    app.mount("/assets", StaticFiles(directory=str(_ASSETS_DIR)), name="assets")
 
 # Single shared Redis client; may be None if Redis is unreachable.
 _redis = redis_store.connect_redis()
@@ -87,10 +103,27 @@ def _run_pipeline(demo: ParsedDemo) -> CoachReport:
         analyzed_player=demo.analyzed_player,
     )
 
-    # 5. Persist report + trace + eval.
+    # 5. Persist report + trace + eval. (Stored BEFORE attaching the heavy
+    #    visualization payload below, so Redis only keeps the analysis.)
     redis_store.store_report(_redis, report)
     arize_tracing.trace_coach_output(report)
     arize_tracing.evaluate_groundedness(report)
+
+    # 6. Attach the map-visualization payload for the client: the radar image
+    #    descriptor + every round's events, each carrying a position snapshot.
+    report.map_radar = map_zones.radar_descriptor(demo.map)
+    report.rounds = [
+        RoundView(
+            round_id=rnd.round_id,
+            round_number=rnd.round_number,
+            side=rnd.side,
+            round_winner=rnd.round_winner,
+            bombsite=rnd.bombsite,
+            bomb=rnd.bomb,
+            events=rnd.events,
+        )
+        for rnd in demo.rounds
+    ]
 
     return report
 

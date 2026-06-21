@@ -22,10 +22,10 @@ from __future__ import annotations
 import os
 import re
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from .map_data import mirage as _mirage
-from .models import ParsedDemo
+from .models import MapRadar, ParsedDemo
 
 UNKNOWN_ZONE = "Unknown"
 
@@ -287,6 +287,53 @@ def resolve_zone(
     if zone == UNKNOWN_ZONE:
         zone = zone_from_callout(map_name, place)
     return zone
+
+
+# ---------------------------------------------------------------------------
+# Radar image + world->image coordinate scaling (for map visualization)
+# ---------------------------------------------------------------------------
+def _radar_cfg(map_name: str) -> Optional[dict]:
+    """The RADAR calibration block for a map, or None if it has none."""
+    mod = _MAP_MODULES.get(_canonical_map(map_name))
+    cfg = getattr(mod, "RADAR", None) if mod else None
+    return cfg if isinstance(cfg, dict) else None
+
+
+def world_to_normalized(
+    map_name: str, x: Optional[float], y: Optional[float]
+) -> Tuple[Optional[float], Optional[float]]:
+    """Scale a world (x, y) to a 0..1 fraction of the map's radar image.
+
+    Returns ``(None, None)`` for unsupported/uncalibrated maps or missing
+    coordinates. The fraction is resolution-independent: the frontend multiplies
+    it by whatever size it renders the radar image at, so positions stay correct
+    at any display size ("scaled to the size of the picture").
+    """
+    cfg = _radar_cfg(map_name)
+    if cfg is None or x is None or y is None:
+        return None, None
+    span = float(cfg["scale"]) * float(cfg["size"])
+    if span == 0:
+        return None, None
+    nx = (float(x) - float(cfg["pos_x"])) / span
+    ny = (float(cfg["pos_y"]) - float(y)) / span
+    return nx, ny
+
+
+def radar_descriptor(map_name: str, asset_base: str = "/assets") -> Optional[MapRadar]:
+    """Build the MapRadar descriptor (image URL + calibration) for a map."""
+    cfg = _radar_cfg(map_name)
+    if cfg is None:
+        return None
+    canonical = _canonical_map(map_name) or map_name
+    return MapRadar(
+        map=canonical,
+        image_url=f"{asset_base.rstrip('/')}/{cfg['image']}",
+        pos_x=float(cfg["pos_x"]),
+        pos_y=float(cfg["pos_y"]),
+        scale=float(cfg["scale"]),
+        size=float(cfg["size"]),
+    )
 
 
 def annotate_zones(demo: ParsedDemo) -> ParsedDemo:

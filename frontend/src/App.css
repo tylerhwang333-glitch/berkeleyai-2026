@@ -555,3 +555,274 @@ summary:focus-visible {
     width: 100%;
   }
 }
+
+/* ---------- event map (MapView) ---------- */
+.mapview {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.mv-controls {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.mv-select {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.mv-select select {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 0.9rem;
+}
+
+.mv-body {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 16px;
+}
+
+.mv-events {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 520px;
+  overflow-y: auto;
+}
+
+.mv-event {
+  width: 100%;
+  text-align: left;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.mv-event:hover {
+  border-color: var(--neon-2);
+}
+
+.mv-event.active {
+  border-color: var(--neon);
+  box-shadow: var(--glow);
+}
+
+.mv-event-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.mv-event-zone {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.mv-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mv-canvas {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: #000;
+}
+
+.mv-canvas img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  user-select: none;
+}
+
+.mv-marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: auto;
+}
+
+.mv-player {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(0, 0, 0, 0.55);
+  color: #fff;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.6);
+}
+
+.mv-player.mv-you {
+  box-shadow: 0 0 0 2px #fff, 0 0 8px var(--neon);
+}
+
+.mv-player.mv-dead {
+  opacity: 0.5;
+  border-style: dashed;
+}
+
+.mv-util {
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+  border: 2px solid currentColor;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.mv-caption {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.mv-legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.mv-leg {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mv-leg-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--line);
+}
+
+.mv-dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.mv-dot.mv-ring {
+  background: #777;
+  box-shadow: 0 0 0 2px #fff;
+}
+
+.mv-dead-dot {
+  background: #777;
+  opacity: 0.6;
+}
+
+.mv-util-dot {
+  border-radius: 4px;
+  border: 2px solid currentColor;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+@media (max-width: 640px) {
+  .mv-body {
+    grid-template-columns: 1fr;
+  }
+  .mv-events {
+    max-height: 180px;
+    flex-direction: row;
+    overflow-x: auto;
+  }
+  .mv-event {
+    min-width: 150px;
+  }
+}
+
+/* ---------- bomb marker + status badge ---------- */
+.mv-bomb {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: #d23b3b;
+  color: #fff;
+  border: 1.5px solid #fff;
+  font-size: 0.55rem;
+  font-weight: 800;
+  box-shadow: 0 0 8px rgba(210, 59, 59, 0.8);
+}
+
+.mv-bomb-badge {
+  align-self: flex-end;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--muted);
+}
+
+.mv-bomb-badge.mv-bomb-planted {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.mv-bomb-badge.mv-bomb-dropped {
+  border-color: var(--warning);
+  color: var(--warning);
+}
+
+/* ---------- per-round map header ---------- */
+.mv-round-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-right: auto;
+}
+
+.mv-round-sub {
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 0.85rem;
+}
+
+.mv-legend {
+  margin: 2px 2px 6px;
+}
+
+/* ---------- round block (map + its moment cards, interleaved) ---------- */
+.round-block + .round-block {
+  border-top: 1px dashed var(--line);
+  margin-top: 20px;
+  padding-top: 4px;
+}
