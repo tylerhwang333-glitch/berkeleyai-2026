@@ -1,0 +1,229 @@
+{
+  "demo_id": "mirage_sample_demo_001",
+  "parser_mode": "sample_fixture",
+  "map": "de_mirage",
+  "player_id": "local_user",
+  "rounds": [
+    {
+      "round_id": "r1",
+      "round_number": 1,
+      "map": "de_mirage",
+      "side": "T",
+      "player_team": "T",
+      "round_winner": "CT",
+      "bombsite": null,
+      "events": [
+        {"timestamp_seconds": 15.0, "event_type": "smoke", "actor": "enemy", "target": "A ramp", "location": "A ramp", "description": "CT smoked A ramp early"},
+        {"timestamp_seconds": 18.0, "event_type": "position", "actor": "player", "location": "A ramp", "description": "Player holds outside A ramp"},
+        {"timestamp_seconds": 46.0, "event_type": "execute", "actor": "player", "location": "A site", "description": "Late A execute attempt"},
+        {"timestamp_seconds": 52.0, "event_type": "death", "actor": "player", "location": "A ramp", "description": "Player dies on late execute"}
+      ],
+      "player_summary": {
+        "survived": false,
+        "death_time_seconds": 52.0,
+        "death_location": "A ramp",
+        "nearest_teammate_distance_on_death": 350.0,
+        "had_flash_support_before_death": true,
+        "utility_unused_on_death": [],
+        "primary_area": "A ramp",
+        "rotated_from": null,
+        "rotated_to": null,
+        "rotation_time_seconds": null,
+        "waited_after_enemy_utility_seconds": 28.0,
+        "alternate_map_control_taken": false
+      }
+    },
+    {
+      "round_id": "r2",
+      "round_number": 2,
+      "map": "de_mirage",
+      "side": "T",
+      "player_team": "T",
+      "round_winner": "CT",
+      "bombsite": null,
+      "events": [
+        {"timestamp_seconds": 12.0, "event_type": "molotov", "actor": "enemy", "target": "A ramp", "location": "A ramp", "description": "CT molotov blocks A ramp"},
+        {"timestamp_seconds": 14.0, "event_type": "position", "actor": "player", "location": "A ramp", "description": "Player waits behind molotov"},
+        {"timestamp_seconds": 40.0, "event_type": "death", "actor": "player", "location": "A ramp", "description": "Player dies to ramp peek"}
+      ],
+      "player_summary": {
+        "survived": false,
+        "death_time_seconds": 40.0,
+        "death_location": "A ramp",
+        "nearest_teammate_distance_on_death": 420.0,
+        "had_flash_support_before_death": true,
+        "utility_unused_on_death": [],
+        "primary_area": "A ramp",
+        "rotated_from": null,
+        "rotated_to": null,
+        "rotation_time_seconds": null,
+        "waited_after_enemy_utility_seconds": 22.0,
+        "alternate_map_control_taken": false
+      }
+    },
+    {
+      "round_id": "r3",
+      "round_number": 3,
+      "map": "de_mirage",
+      "side": "T",
+      "player_team": "T",
+      "round_winner": "CT",
+      "bombsite": null,
+      "events": [
+        {"timestamp_seconds": 20.0, "event_type": "push", "actor": "player", "location": "mid", "description": "Player pushes mid alone"},
+        {"timestamp_seconds": 33.0, "event_type": "death", "actor": "player", "location": "mid", "description": "Player dies mid isolated"}
+      ],
+      "player_summary": {
+        "survived": false,
+        "death_time_seconds": 33.0,
+        "death_location": "mid",
+        "nearest_teammate_distance_on_death": 1400.0,
+        "had_flash_support_before_death": false,
+        "utility_unused_on_death": ["flash"],
+        "primary_area": "mid",
+        "rotated_from": null,
+        "rotated_to": null,
+        "rotation_time_seconds": null,
+        "waited_after_enemy_utility_seconds": null,
+        "alternate_map_control_taken": false
+      }
+    },
+    {
+      "round_id": "r4",
+      "round_number": 4,
+      "map": "de_mirage",
+      "side": "CT",
+      "player_team": "CT",
+      "round_winner": "T",
+      "bombsite": "B",
+      "events": [
+        {"timestamp_seconds": 25.0, "event_type": "rotation", "actor": "player", "location": "A to B", "description": "Player rotates A to B early"},
+        {"timestamp_seconds": 30.0, "event_type": "bomb_plant", "actor": "enemy", "location": "A site", "description": "Bomb planted A after player left"},
+        {"timestamp_seconds": 48.0, "event_type": "death", "actor": "player", "location": "B", "description": "Player dies retaking wrong site"}
+      ],
+      "player_summary": {
+        "survived": false,
+        "death_time_seconds": 48.0,
+        "death_location": "B",
+        "nearest_teammate_distance_on_death": 600.0,
+        "had_flash_support_before_death": true,
+        "utility_unused_on_death": [],
+        "primary_area": "A site",
+        "rotated_from": "A",
+        "rotated_to": "B",
+        "rotation_time_seconds": 25.0,
+        "waited_after_enemy_utility_seconds": null,
+        "alternate_map_control_taken": false
+      }
+    },
+    {
+      "round_id": "r5",
+      "round_number": 5,
+      "map": "de_mirage",
+      "side": "CT",
+      "player_team": "CT",
+      "round_winner": "CT",
+      "bombsite": "A",
+      "events": [
+        {"timestamp_seconds": 22.0, "event_type": "death", "actor": "player", "location": "A site", "description": "Player dies holding A with full nades"}
+      ],
+      "player_summary": {
+        "survived": false,
+        "death_time_seconds": 22.0,
+        "death_location": "A site",
+        "nearest_teammate_distance_on_death": 500.0,
+        "had_flash_support_before_death": true,
+        "utility_unused_on_death": ["smoke", "flash", "molotov"],
+        "primary_area": "A site",
+        "rotated_from": null,
+        "rotated_to": null,
+        "rotation_time_seconds": null,
+        "waited_after_enemy_utility_seconds": null,
+        "alternate_map_control_taken": false
+      }
+    },
+    {
+      "round_id": "r6",
+      "round_number": 6,
+      "map": "de_mirage",
+      "side": "T",
+      "player_team": "T",
+      "round_winner": "T",
+      "bombsite": "A",
+      "events": [
+        {"timestamp_seconds": 16.0, "event_type": "smoke", "actor": "enemy", "target": "A ramp", "location": "A ramp", "description": "CT smokes A ramp"},
+        {"timestamp_seconds": 19.0, "event_type": "mid_control", "actor": "player", "location": "mid", "description": "Player takes mid control instead of waiting"},
+        {"timestamp_seconds": 42.0, "event_type": "bomb_plant", "actor": "player", "location": "A site", "description": "Successful split A execute"}
+      ],
+      "player_summary": {
+        "survived": true,
+        "death_time_seconds": null,
+        "death_location": null,
+        "nearest_teammate_distance_on_death": null,
+        "had_flash_support_before_death": false,
+        "utility_unused_on_death": [],
+        "primary_area": "mid",
+        "rotated_from": null,
+        "rotated_to": null,
+        "rotation_time_seconds": null,
+        "waited_after_enemy_utility_seconds": 3.0,
+        "alternate_map_control_taken": true
+      }
+    },
+    {
+      "round_id": "r7",
+      "round_number": 7,
+      "map": "de_mirage",
+      "side": "CT",
+      "player_team": "CT",
+      "round_winner": "T",
+      "bombsite": "A",
+      "events": [
+        {"timestamp_seconds": 28.0, "event_type": "rotation", "actor": "player", "location": "B to A", "description": "Player rotates B to A on one smoke, no bomb info"},
+        {"timestamp_seconds": 35.0, "event_type": "enemy_pressure", "actor": "enemy", "location": "B site", "description": "Enemies hit B after player left"},
+        {"timestamp_seconds": 41.0, "event_type": "death", "actor": "player", "location": "A", "description": "Player dies out of position"}
+      ],
+      "player_summary": {
+        "survived": false,
+        "death_time_seconds": 41.0,
+        "death_location": "A",
+        "nearest_teammate_distance_on_death": 700.0,
+        "had_flash_support_before_death": true,
+        "utility_unused_on_death": [],
+        "primary_area": "B site",
+        "rotated_from": "B",
+        "rotated_to": "A",
+        "rotation_time_seconds": 28.0,
+        "waited_after_enemy_utility_seconds": null,
+        "alternate_map_control_taken": false
+      }
+    },
+    {
+      "round_id": "r8",
+      "round_number": 8,
+      "map": "de_mirage",
+      "side": "T",
+      "player_team": "T",
+      "round_winner": "CT",
+      "bombsite": null,
+      "events": [
+        {"timestamp_seconds": 18.0, "event_type": "push", "actor": "player", "location": "B apps", "description": "Player pushes B apps alone"},
+        {"timestamp_seconds": 29.0, "event_type": "death", "actor": "player", "location": "B apps", "description": "Player dies isolated in apps"}
+      ],
+      "player_summary": {
+        "survived": false,
+        "death_time_seconds": 29.0,
+        "death_location": "B apps",
+        "nearest_teammate_distance_on_death": 1250.0,
+        "had_flash_support_before_death": false,
+        "utility_unused_on_death": ["smoke"],
+        "primary_area": "B apps",
+        "rotated_from": null,
+        "rotated_to": null,
+        "rotation_time_seconds": null,
+        "waited_after_enemy_utility_seconds": null,
+        "alternate_map_control_taken": false
+      }
+    }
+  ]
+}
