@@ -25,14 +25,19 @@ class GameEvent(BaseModel):
     event_type: str  # e.g. "smoke", "molotov", "death", "rotation", "bomb_plant"
     actor: str  # "enemy", "player", "teammate", etc.
     target: Optional[str] = None
-    location: Optional[str] = None
+    location: Optional[str] = None  # raw CS2 callout (last_place_name)
+    # Canonical map zone resolved deterministically from coordinates/callout
+    # (see app/map_zones.py). The coach may only refer to these labels.
+    zone: Optional[str] = None
     description: str = ""
 
 
 class PlayerRoundSummary(BaseModel):
     survived: bool
     death_time_seconds: Optional[float] = None
-    death_location: Optional[str] = None
+    death_location: Optional[str] = None  # raw CS2 callout
+    death_zone: Optional[str] = None  # canonical zone (app/map_zones.py)
+    primary_zone: Optional[str] = None  # canonical zone the player spent the round in
     nearest_teammate_distance_on_death: Optional[float] = None
     had_flash_support_before_death: bool = False
     utility_unused_on_death: List[str] = Field(default_factory=list)
@@ -75,6 +80,7 @@ class DecisionMoment(BaseModel):
     round_id: str
     map: str
     side: str
+    zone: Optional[str] = None  # canonical map zone for this moment (or "Unknown")
     timestamp_seconds: float
     enemy_action: str
     user_response: str

@@ -13,7 +13,7 @@ from typing import List
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import arize_tracing, coach, redis_store
+from . import arize_tracing, coach, map_zones, redis_store
 from .detectors import run_detectors
 from .models import AnalyzeSampleRequest, CoachReport, DecisionMoment, ParsedDemo, SimilarMemoryItem
 from .parser import JsonUploadParser, MockDemParser, SampleFixtureParser
@@ -51,6 +51,11 @@ def _run_pipeline(demo: ParsedDemo) -> CoachReport:
     arize_tracing.trace_pipeline_start(
         {"demo_id": demo.demo_id, "parser_mode": demo.parser_mode, "player_id": demo.player_id, "rounds": len(demo.rounds)}
     )
+
+    # 0. Resolve deterministic canonical map zones BEFORE anything reads
+    #    locations. This pins the coach to a fixed vocabulary so it can never
+    #    hallucinate a callout from raw coordinates. Degrades to "Unknown".
+    map_zones.annotate_zones(demo)
 
     # 1. Detect decision moments.
     moments: List[DecisionMoment] = run_detectors(demo)

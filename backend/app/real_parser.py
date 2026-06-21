@@ -27,6 +27,7 @@ import math
 from collections import Counter
 from typing import Dict, List, Optional, Tuple
 
+from .map_zones import UNKNOWN_ZONE, resolve_zone
 from .models import GameEvent, ParsedDemo, PlayerRoundSummary, RoundFacts
 
 # CS2 competitive demos record 64 ticks/second. demoparser2 does not surface a
@@ -508,10 +509,19 @@ class RealDemParser:
                     )
         alive_path = [p for p in path if p["alive"]]
         primary_area = ""
+        primary_zone = UNKNOWN_ZONE
         if alive_path:
             places = [p["place"] for p in alive_path if p["place"]]
             if places:
                 primary_area = Counter(places).most_common(1)[0][0]
+            # Most-common canonical zone over the player's real position timeline.
+            zones = [
+                resolve_zone(map_name, p["x"], p["y"], p["z"], place=p["place"])
+                for p in alive_path
+            ]
+            zones = [z for z in zones if z != UNKNOWN_ZONE]
+            if zones:
+                primary_zone = Counter(zones).most_common(1)[0][0]
 
         # ---- events list (utility, bomb, the player's death) -----------------
         events: List[GameEvent] = []
@@ -520,12 +530,15 @@ class RealDemParser:
                 continue
             actor = self._actor_of(det["steamid"], target, target_team, det["tick"], death_positions, timeline)
             location = self._place_near(det["x"], det["y"], det["z"], det["tick"], timeline) or ""
+            # Coordinate-first canonical zone (callout as deterministic fallback).
+            zone = resolve_zone(map_name, det["x"], det["y"], det["z"], place=location)
             events.append(
                 GameEvent(
                     timestamp_seconds=secs(det["tick"]),
                     event_type=det["util"],
                     actor=actor,
                     location=location,
+                    zone=zone,
                     description=f"{actor.title()} {det['util']} at {location or 'unknown'}",
                 )
             )
@@ -565,6 +578,16 @@ class RealDemParser:
             if death_tick is not None
             else None
         )
+        death_zone = UNKNOWN_ZONE
+        if death_tick is not None:
+            dpos = self._pos_of(target, death_tick, death_positions, timeline)
+            death_zone = resolve_zone(
+                map_name,
+                dpos[0] if dpos else None,
+                dpos[1] if dpos else None,
+                dpos[2] if dpos else None,
+                place=death_place,
+            )
         if death is not None:
             events.append(
                 GameEvent(
@@ -572,6 +595,7 @@ class RealDemParser:
                     event_type="death",
                     actor="player",
                     location=death_place or "",
+                    zone=death_zone,
                     description=f"Player died to {death.get('attacker_name', 'enemy')} ({death.get('weapon', '?')})",
                 )
             )
@@ -599,6 +623,8 @@ class RealDemParser:
             survived=survived,
             death_time_seconds=death_time,
             death_location=death_place,
+            death_zone=death_zone,
+            primary_zone=primary_zone,
             nearest_teammate_distance_on_death=nearest,
             had_flash_support_before_death=flash_support,
             utility_unused_on_death=unused,
@@ -686,6 +712,25 @@ class RealDemParser:
             for snap in timeline[t]:
                 if snap["steamid"] == steamid and snap.get("place"):
                     return snap["place"]
+        return None
+
+    def _pos_of(
+        self,
+        steamid: str,
+        tick: int,
+        deaths_pos: Dict[int, List[dict]],
+        timeline: Dict[int, List[dict]],
+    ) -> Optional[Tuple[float, float, float]]:
+        """Exact (x, y, z) of a player at a tick (death-tick positions first)."""
+        for src in (deaths_pos, timeline):
+            if tick in src:
+                for snap in src[tick]:
+                    if snap["steamid"] == steamid:
+                        return (snap["x"], snap["y"], snap["z"])
+        for t in sorted(timeline, key=lambda v: abs(v - tick))[:3]:
+            for snap in timeline[t]:
+                if snap["steamid"] == steamid:
+                    return (snap["x"], snap["y"], snap["z"])
         return None
 
     def _place_near(
