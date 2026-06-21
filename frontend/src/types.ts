@@ -108,3 +108,12 @@ export interface PlayerMemoryResponse {
   count: number;
   moments: DecisionMoment[];
 }
+
+export interface HealthResponse {
+  status: string;
+  // False when the backend can't reach Redis. The memory layer (saved patterns
+  // + recurring-pattern retrieval) silently no-ops in that state, so the UI
+  // surfaces it instead of letting "0 patterns" look like a clean record.
+  redis_connected: boolean;
+  vector_index: boolean;
+}

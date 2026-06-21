@@ -1,4 +1,4 @@
-import type { CoachReport, PlayerMemoryResponse } from "./types";
+import type { CoachReport, HealthResponse, PlayerMemoryResponse } from "./types";
 
 // When VITE_BACKEND_URL is undefined (e.g. local `npm run dev`) we fall back to
 // the dev backend. In the Docker/production build it is set to "" so requests go
@@ -43,6 +43,11 @@ export async function analyzeUpload(
     body: form,
   });
   return handle<CoachReport>(res);
+}
+
+export async function getHealth(): Promise<HealthResponse> {
+  const res = await fetch(`${API_BASE}/health`);
+  return handle<HealthResponse>(res);
 }
 
 export async function getPlayerMemory(playerId: string): Promise<PlayerMemoryResponse> {

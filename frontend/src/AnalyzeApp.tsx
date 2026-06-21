@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { analyzeSample, analyzeUpload, getPlayerMemory } from "./api";
+import { useEffect, useState } from "react";
+import { analyzeSample, analyzeUpload, getHealth, getPlayerMemory } from "./api";
 import type { CoachReport, DecisionMoment } from "./types";
 import { MapLegend, RoundMap, mappableRounds } from "./MapView";
 
@@ -151,6 +151,25 @@ export default function AnalyzeApp() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<CoachReport | null>(null);
+  // null = not yet checked. false = backend reachable but Redis down, so the
+  // memory layer is silently no-op'ing (nothing saved, no patterns retrieved).
+  const [memoryOnline, setMemoryOnline] = useState<boolean | null>(null);
+
+  // Poll backend health on mount so we can warn loudly when the memory layer is
+  // offline instead of letting empty "Recurring patterns" look like a clean run.
+  useEffect(() => {
+    let cancelled = false;
+    getHealth()
+      .then((h) => {
+        if (!cancelled) setMemoryOnline(h.redis_connected);
+      })
+      .catch(() => {
+        if (!cancelled) setMemoryOnline(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function run(fn: () => Promise<CoachReport>) {
     setLoading(true);
@@ -167,6 +186,12 @@ export default function AnalyzeApp() {
 
   async function loadMemory() {
     setError(null);
+    if (memoryOnline === false) {
+      setError(
+        "Memory backend is offline — no patterns are being saved. Check the backend's Redis connection (REDIS_URL).",
+      );
+      return;
+    }
     try {
       const mem = await getPlayerMemory(playerId);
       alert(`${mem.count} saved decision moments for "${mem.player_id}".`);
@@ -193,6 +218,17 @@ export default function AnalyzeApp() {
           See exactly which decisions cost you the round — and the better play you should have made.
         </p>
       </header>
+
+      {memoryOnline === false && (
+        <div className="card status-card error" role="alert">
+          <strong>Memory backend offline.</strong>
+          <span>
+            The backend can't reach Redis, so decision moments are <em>not</em> being saved and
+            recurring patterns can't be retrieved. Fix the backend's Redis connection (REDIS_URL) to
+            restore your improvement history.
+          </span>
+        </div>
+      )}
 
       <section className="card controls">
         <div className="field">
@@ -304,7 +340,9 @@ export default function AnalyzeApp() {
           </div>
           {report.similar_memory.length === 0 ? (
             <div className="card empty">
-              No recurring patterns yet. Analyze more rounds to build your improvement history.
+              {memoryOnline === false
+                ? "Recurring patterns are unavailable — the memory backend is offline (see the warning above)."
+                : "No recurring patterns yet. Analyze more rounds to build your improvement history."}
             </div>
           ) : (
             <div className="pattern-grid">

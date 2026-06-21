@@ -23,8 +23,13 @@
 body {
   margin: 0;
   background:
+    /* accent glows (top) */
     radial-gradient(1200px 600px at 50% -10%, rgba(123, 92, 255, 0.16), transparent 60%),
     radial-gradient(900px 500px at 85% 5%, rgba(0, 229, 255, 0.1), transparent 55%),
+    /* dark mask so the optional background photo stays subtle, not bright */
+    linear-gradient(180deg, rgba(7, 8, 13, 0.82), rgba(7, 8, 13, 0.92)),
+    /* optional site background: drop frontend/public/background/bg.jpg */
+    url("/background/bg.jpg") center / cover no-repeat,
     var(--bg-0);
   background-attachment: fixed;
   color: var(--text);

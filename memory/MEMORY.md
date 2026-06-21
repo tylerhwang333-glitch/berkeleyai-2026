@@ -1,0 +1,1 @@
+- [Redis memory layer down](redis-memory-layer-down.md) — cloud Redis is dead; coach memory/patterns silently no-op until REDIS_URL points at a live instance
