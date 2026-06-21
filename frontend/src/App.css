@@ -1,19 +1,19 @@
 :root {
-  /* shared rankup.ai design tokens (mirrors Home.css) */
-  --neon: #00e5ff;
-  --neon-2: #7b5cff;
-  --pink: #ff3ea5;
-  --bg-0: #07080d;
-  --panel: #11131d;
-  --panel-2: #161a26;
-  --line: #232838;
-  --text: #eef1f7;
-  --muted: #9aa3b2;
-  --success: #3ddc97;
-  --warning: #ffb454;
-  --danger: #ff6b6b;
+  /* shared Counter-Strike design tokens (mirrors Home.css) */
+  --neon: #d7b14a;       /* CS gold / weapon-case yellow (primary accent) */
+  --neon-2: #a6824c;     /* desert tan / crate brown (secondary accent) */
+  --pink: #b0603f;       /* muted rust */
+  --bg-0: #0d0c0a;       /* dark warm gunmetal */
+  --panel: #1b1813;
+  --panel-2: #23201a;
+  --line: #3a352b;
+  --text: #e9e4d6;       /* warm off-white */
+  --muted: #9c9484;      /* warm gray */
+  --success: #9bab4f;    /* olive green */
+  --warning: #d9a637;
+  --danger: #c0533f;
   --radius: 14px;
-  --glow: 0 8px 30px rgba(0, 229, 255, 0.18);
+  --glow: 0 8px 30px rgba(215, 177, 74, 0.18);
 }
 
 * {
@@ -24,10 +24,10 @@ body {
   margin: 0;
   background:
     /* accent glows (top) */
-    radial-gradient(1200px 600px at 50% -10%, rgba(123, 92, 255, 0.16), transparent 60%),
-    radial-gradient(900px 500px at 85% 5%, rgba(0, 229, 255, 0.1), transparent 55%),
+    radial-gradient(1200px 600px at 50% -10%, rgba(166, 130, 76, 0.16), transparent 60%),
+    radial-gradient(900px 500px at 85% 5%, rgba(215, 177, 74, 0.1), transparent 55%),
     /* dark mask so the optional background photo stays subtle, not bright */
-    linear-gradient(180deg, rgba(7, 8, 13, 0.82), rgba(7, 8, 13, 0.92)),
+    linear-gradient(180deg, rgba(13, 12, 10, 0.82), rgba(13, 12, 10, 0.92)),
     /* optional site background: drop frontend/public/background/bg.jpg */
     url("/background/bg.jpg") center / cover no-repeat,
     var(--bg-0);
@@ -90,8 +90,8 @@ body {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--neon);
-  border: 1px solid rgba(0, 229, 255, 0.35);
-  background: rgba(0, 229, 255, 0.07);
+  border: 1px solid rgba(215, 177, 74, 0.35);
+  background: rgba(215, 177, 74, 0.07);
   padding: 6px 12px;
   border-radius: 999px;
 }
@@ -141,7 +141,7 @@ input {
   display: block;
   width: 100%;
   padding: 11px 13px;
-  background: #0b0d14;
+  background: #100e0a;
   border: 1px solid var(--line);
   border-radius: 10px;
   color: var(--text);
@@ -150,13 +150,13 @@ input {
 }
 
 input::placeholder {
-  color: #5f6878;
+  color: #6b655a;
 }
 
 input:focus {
   outline: none;
   border-color: var(--neon);
-  box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.18);
+  box-shadow: 0 0 0 3px rgba(215, 177, 74, 0.18);
 }
 
 input[type="file"] {
@@ -212,13 +212,13 @@ input[type="file"]::file-selector-button:hover {
 
 .btn.primary {
   background: linear-gradient(90deg, var(--neon), var(--neon-2));
-  color: #06070c;
+  color: #1a160d;
   box-shadow: var(--glow);
 }
 
 .btn.primary:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 12px 38px rgba(0, 229, 255, 0.34);
+  box-shadow: 0 12px 38px rgba(215, 177, 74, 0.34);
 }
 
 .btn.ghost {
@@ -229,7 +229,7 @@ input[type="file"]::file-selector-button:hover {
 
 .btn.ghost:hover:not(:disabled) {
   border-color: var(--neon-2);
-  color: #c9bcff;
+  color: #d8c7a0;
 }
 
 .btn:disabled {
@@ -257,8 +257,8 @@ summary:focus-visible {
   flex-direction: column;
   align-items: flex-start;
   gap: 6px;
-  border-color: rgba(255, 107, 107, 0.4);
-  background: linear-gradient(180deg, rgba(255, 107, 107, 0.08), var(--panel));
+  border-color: rgba(192, 83, 63, 0.4);
+  background: linear-gradient(180deg, rgba(192, 83, 63, 0.08), var(--panel));
 }
 
 .status-card.error strong {
@@ -269,7 +269,7 @@ summary:focus-visible {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  border: 2px solid rgba(0, 229, 255, 0.25);
+  border: 2px solid rgba(215, 177, 74, 0.25);
   border-top-color: var(--neon);
   animation: spin 0.8s linear infinite;
   flex-shrink: 0;
@@ -306,8 +306,8 @@ summary:focus-visible {
   font-family: ui-monospace, monospace;
   font-size: 0.78rem;
   color: var(--neon);
-  border: 1px solid rgba(0, 229, 255, 0.35);
-  background: rgba(0, 229, 255, 0.07);
+  border: 1px solid rgba(215, 177, 74, 0.35);
+  background: rgba(215, 177, 74, 0.07);
   border-radius: 999px;
   padding: 2px 10px;
 }
@@ -319,7 +319,7 @@ summary:focus-visible {
 
 .summary p {
   margin: 0;
-  color: #dfe4ee;
+  color: #dcd6c6;
 }
 
 .empty {
@@ -338,17 +338,17 @@ summary:focus-visible {
 .meta-pill {
   font-size: 0.8rem;
   font-weight: 600;
-  color: #cfe0ff;
-  background: rgba(123, 92, 255, 0.12);
-  border: 1px solid rgba(123, 92, 255, 0.3);
+  color: #d8c9a8;
+  background: rgba(166, 130, 76, 0.12);
+  border: 1px solid rgba(166, 130, 76, 0.3);
   border-radius: 8px;
   padding: 4px 10px;
 }
 
 .meta-pill.strong {
   color: var(--text);
-  background: rgba(0, 229, 255, 0.12);
-  border-color: rgba(0, 229, 255, 0.35);
+  background: rgba(215, 177, 74, 0.12);
+  border-color: rgba(215, 177, 74, 0.35);
 }
 
 .meta-pill.subtle {
@@ -362,8 +362,8 @@ summary:focus-visible {
   font-weight: 800;
   letter-spacing: -0.01em;
   color: var(--text);
-  background: linear-gradient(90deg, rgba(255, 62, 165, 0.18), rgba(123, 92, 255, 0.18));
-  border: 1px solid rgba(255, 62, 165, 0.35);
+  background: linear-gradient(90deg, rgba(176, 96, 63, 0.18), rgba(166, 130, 76, 0.18));
+  border: 1px solid rgba(176, 96, 63, 0.35);
   border-radius: 10px;
   padding: 6px 14px;
 }
@@ -446,8 +446,8 @@ summary:focus-visible {
 }
 
 .better-play {
-  border: 1px solid rgba(61, 220, 151, 0.35);
-  background: rgba(61, 220, 151, 0.08);
+  border: 1px solid rgba(155, 171, 79, 0.35);
+  background: rgba(155, 171, 79, 0.08);
   border-radius: 10px;
   padding: 14px 16px;
 }
@@ -464,7 +464,7 @@ summary:focus-visible {
 
 .better-play p {
   margin: 0;
-  color: #e7fff3;
+  color: #eef3d8;
 }
 
 .evidence {
@@ -540,7 +540,7 @@ summary:focus-visible {
 
 .pattern p {
   margin: 0 0 12px;
-  color: #dfe4ee;
+  color: #dcd6c6;
   font-size: 0.92rem;
 }
 
@@ -779,12 +779,12 @@ summary:focus-visible {
   width: 18px;
   height: 18px;
   border-radius: 4px;
-  background: #d23b3b;
+  background: var(--danger);
   color: #fff;
   border: 1.5px solid #fff;
   font-size: 0.55rem;
   font-weight: 800;
-  box-shadow: 0 0 8px rgba(210, 59, 59, 0.8);
+  box-shadow: 0 0 8px rgba(192, 83, 63, 0.8);
 }
 
 .mv-bomb-badge {

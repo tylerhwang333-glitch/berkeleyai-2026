@@ -1,21 +1,21 @@
 .home {
-  --neon: #00e5ff;
-  --neon-2: #7b5cff;
-  --pink: #ff3ea5;
-  --bg-0: #07080d;
-  --bg-1: #0d0f17;
-  --panel: #11131d;
-  --panel-2: #161a26;
-  --line: #232838;
-  --text: #eef1f7;
-  --muted: #9aa3b2;
+  --neon: #d7b14a;
+  --neon-2: #a6824c;
+  --pink: #b0603f;
+  --bg-0: #0d0c0a;
+  --bg-1: #15130f;
+  --panel: #1b1813;
+  --panel-2: #23201a;
+  --line: #3a352b;
+  --text: #e9e4d6;
+  --muted: #9c9484;
 
   background:
     /* accent glows (top) */
-    radial-gradient(1200px 600px at 50% -10%, rgba(123, 92, 255, 0.18), transparent 60%),
-    radial-gradient(900px 500px at 85% 10%, rgba(0, 229, 255, 0.12), transparent 55%),
+    radial-gradient(1200px 600px at 50% -10%, rgba(166, 130, 76, 0.18), transparent 60%),
+    radial-gradient(900px 500px at 85% 10%, rgba(215, 177, 74, 0.12), transparent 55%),
     /* dark mask so the optional background photo stays subtle, not bright */
-    linear-gradient(180deg, rgba(7, 8, 13, 0.82), rgba(7, 8, 13, 0.92)),
+    linear-gradient(180deg, rgba(13, 12, 10, 0.82), rgba(13, 12, 10, 0.92)),
     /* optional site background: drop frontend/public/background/bg.jpg */
     url("/background/bg.jpg") center / cover no-repeat fixed,
     var(--bg-0);
@@ -81,7 +81,7 @@
   position: absolute;
   inset: -20% 20% auto 20%;
   height: 420px;
-  background: radial-gradient(closest-side, rgba(0, 229, 255, 0.22), transparent);
+  background: radial-gradient(closest-side, rgba(215, 177, 74, 0.22), transparent);
   filter: blur(40px);
   pointer-events: none;
 }
@@ -97,8 +97,8 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--neon);
-  border: 1px solid rgba(0, 229, 255, 0.35);
-  background: rgba(0, 229, 255, 0.07);
+  border: 1px solid rgba(215, 177, 74, 0.35);
+  background: rgba(215, 177, 74, 0.07);
   padding: 6px 12px;
   border-radius: 999px;
   margin-bottom: 22px;
@@ -148,14 +148,14 @@
 
 .cta.primary {
   background: linear-gradient(90deg, var(--neon), var(--neon-2));
-  color: #06070c;
-  box-shadow: 0 8px 30px rgba(0, 229, 255, 0.28);
+  color: #1a160d;
+  box-shadow: 0 8px 30px rgba(215, 177, 74, 0.28);
   transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
 
 .cta.primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 12px 38px rgba(0, 229, 255, 0.4);
+  box-shadow: 0 12px 38px rgba(215, 177, 74, 0.4);
 }
 
 .cta.ghost {
@@ -166,7 +166,7 @@
 
 .cta.ghost:hover {
   border-color: var(--neon-2);
-  color: #c9bcff;
+  color: #d8c7a0;
 }
 
 .hero-note {
@@ -263,7 +263,7 @@
 }
 
 .feature-card:hover {
-  border-color: rgba(0, 229, 255, 0.4);
+  border-color: rgba(215, 177, 74, 0.4);
   transform: translateY(-3px);
 }
 
@@ -314,8 +314,8 @@
   gap: 20px;
   flex-wrap: wrap;
   background:
-    linear-gradient(90deg, rgba(0, 229, 255, 0.1), rgba(123, 92, 255, 0.12));
-  border: 1px solid rgba(123, 92, 255, 0.35);
+    linear-gradient(90deg, rgba(215, 177, 74, 0.1), rgba(166, 130, 76, 0.12));
+  border: 1px solid rgba(166, 130, 76, 0.35);
   border-radius: 16px;
   padding: 28px 30px;
 }
