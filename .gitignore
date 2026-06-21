@@ -13,3 +13,4 @@ frontend/*.tsbuildinfo
 
 # Misc
 .DS_Store
+frontend/public/background/bg.jpg:Zone.Identifier
