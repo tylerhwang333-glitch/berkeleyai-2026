@@ -4,3 +4,5 @@ pydantic>=2.11
 redis>=5.2.1
 python-multipart>=0.0.20
 anthropic>=0.42.0
+# Real CS2 .dem parsing (LaihoE/demoparser). Ships native wheels.
+demoparser2>=0.41.0

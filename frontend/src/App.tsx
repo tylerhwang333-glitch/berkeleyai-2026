@@ -2,6 +2,13 @@ import { useState } from "react";
 import { analyzeSample, analyzeUpload, getPlayerMemory } from "./api";
 import type { CoachReport, DecisionMoment } from "./types";
 
+const PARSER_MODE_LABELS: Record<string, string> = {
+  sample_fixture: "Sample fixture",
+  json_upload: "Parsed JSON upload",
+  real_dem_parser: "Real .dem (demoparser2)",
+  mock_dem_parser: "Mock .dem",
+};
+
 function MomentCard({ m }: { m: DecisionMoment }) {
   return (
     <div className="card moment">
@@ -30,6 +37,7 @@ function MomentCard({ m }: { m: DecisionMoment }) {
 export default function App() {
   const [playerId, setPlayerId] = useState("local_user");
   const [file, setFile] = useState<File | null>(null);
+  const [playerName, setPlayerName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<CoachReport | null>(null);
@@ -85,16 +93,28 @@ export default function App() {
         <hr />
 
         <label>
-          Upload a demo (.dem or already-parsed .json)
+          Upload a real CS2 demo (.dem) or already-parsed .json
           <input
             type="file"
             accept=".dem,.json"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
           />
         </label>
+        <label>
+          In-demo player name to coach (optional, for .dem)
+          <input
+            value={playerName}
+            onChange={(e) => setPlayerName(e.target.value)}
+            placeholder="e.g. your Steam name in the demo"
+          />
+        </label>
+        <p className="muted">
+          .dem files are parsed for real (demoparser2). If no name is given, the first
+          player in the demo is analyzed.
+        </p>
         <button
           disabled={loading || !file}
-          onClick={() => file && run(() => analyzeUpload(file, playerId))}
+          onClick={() => file && run(() => analyzeUpload(file, playerId, playerName))}
         >
           Upload and Analyze
         </button>
@@ -108,7 +128,13 @@ export default function App() {
           <div className="card meta">
             <div><strong>Demo ID:</strong> {report.demo_id}</div>
             <div><strong>Map:</strong> {report.map}</div>
-            <div><strong>Parser mode:</strong> <span className="tag">{report.parser_mode}</span></div>
+            {report.analyzed_player && (
+              <div><strong>Analyzed player:</strong> {report.analyzed_player}</div>
+            )}
+            <div>
+              <strong>Parser mode:</strong>{" "}
+              <span className="tag">{PARSER_MODE_LABELS[report.parser_mode] ?? report.parser_mode}</span>
+            </div>
           </div>
 
           <div className="card summary">

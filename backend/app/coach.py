@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import os
 from collections import Counter
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from .models import CoachReport, DecisionMoment, SimilarMemoryItem
 
@@ -176,6 +176,7 @@ def build_report(
     map_name: str,
     moments: List[DecisionMoment],
     similar_memory: List[SimilarMemoryItem],
+    analyzed_player: Optional[str] = None,
 ) -> CoachReport:
     summary, _used_llm = generate_coach_summary(moments, similar_memory)
     drills = build_drills(moments)
@@ -185,6 +186,7 @@ def build_report(
         demo_id=demo_id,
         parser_mode=parser_mode,
         map=map_name,
+        analyzed_player=analyzed_player,
         moments=moments,
         similar_memory=similar_memory,
         final_coaching_summary=summary,

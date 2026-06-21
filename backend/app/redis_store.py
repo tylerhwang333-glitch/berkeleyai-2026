@@ -18,6 +18,7 @@ import json
 import math
 import os
 import struct
+import time
 from typing import List, Optional
 
 import redis
@@ -25,6 +26,9 @@ import redis
 from .models import CoachReport, DecisionMoment, SimilarMemoryItem
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
+# When truthy, the app refuses to start if Redis is unreachable instead of
+# silently degrading the memory layer to a no-op.
+REDIS_REQUIRED = os.environ.get("REDIS_REQUIRED", "").lower() in ("1", "true", "yes")
 EMBED_DIM = 64
 INDEX_NAME = "moments_idx"
 MOMENT_PREFIX = "moment:"
@@ -35,15 +39,34 @@ _vector_index_ready = False
 # ---------------------------------------------------------------------------
 # Connection
 # ---------------------------------------------------------------------------
-def connect_redis() -> Optional["redis.Redis"]:
-    """Return a connected Redis client, or None if Redis is unreachable."""
-    try:
-        client = redis.Redis.from_url(REDIS_URL, decode_responses=False)
-        client.ping()
-        return client
-    except Exception as exc:  # noqa: BLE001 - hackathon: never crash on Redis
-        print(f"[redis_store] Redis unavailable: {exc}")
-        return None
+def connect_redis(retries: int = 5, backoff: float = 0.5) -> Optional["redis.Redis"]:
+    """Return a connected Redis client, retrying briefly first.
+
+    Real demos hit Redis on every analysis (it is the persistent memory layer),
+    so a flaky/slow-to-boot Redis shouldn't silently disable memory on the first
+    request. We retry with linear backoff. If REDIS_REQUIRED is set we raise;
+    otherwise we return None and the pipeline runs without memory.
+    """
+    last_exc: Optional[Exception] = None
+    for attempt in range(1, retries + 1):
+        try:
+            client = redis.Redis.from_url(
+                REDIS_URL, decode_responses=False, socket_connect_timeout=3
+            )
+            client.ping()
+            if attempt > 1:
+                print(f"[redis_store] Connected to Redis on attempt {attempt}.")
+            return client
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            if attempt < retries:
+                time.sleep(backoff * attempt)
+
+    msg = f"Redis unavailable after {retries} attempts at {REDIS_URL}: {last_exc}"
+    if REDIS_REQUIRED:
+        raise RuntimeError(msg)
+    print(f"[redis_store] {msg} — memory features disabled for now.")
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -92,7 +115,12 @@ def ensure_indexes(client: Optional["redis.Redis"]) -> bool:
         return False
     try:
         from redis.commands.search.field import TagField, TextField, VectorField
-        from redis.commands.search.indexDefinition import IndexDefinition, IndexType
+
+        try:
+            # redis-py >= 5/8 uses snake_case module name.
+            from redis.commands.search.index_definition import IndexDefinition, IndexType
+        except ImportError:  # older redis-py
+            from redis.commands.search.indexDefinition import IndexDefinition, IndexType
 
         try:
             client.ft(INDEX_NAME).info()

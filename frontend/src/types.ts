@@ -30,6 +30,7 @@ export interface CoachReport {
   demo_id: string;
   parser_mode: string;
   map: string;
+  analyzed_player?: string | null;
   moments: DecisionMoment[];
   similar_memory: SimilarMemoryItem[];
   final_coaching_summary: string;

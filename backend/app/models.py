@@ -58,9 +58,10 @@ class RoundFacts(BaseModel):
 
 class ParsedDemo(BaseModel):
     demo_id: str
-    parser_mode: str  # "sample_fixture" | "json_upload" | "mock_dem_parser"
+    parser_mode: str  # "sample_fixture" | "json_upload" | "mock_dem_parser" | "real_dem_parser"
     map: str
     player_id: str
+    analyzed_player: Optional[str] = None  # in-demo name of the coached player (real .dem)
     rounds: List[RoundFacts] = Field(default_factory=list)
 
 
@@ -99,6 +100,7 @@ class CoachReport(BaseModel):
     demo_id: str
     parser_mode: str
     map: str
+    analyzed_player: Optional[str] = None
     moments: List[DecisionMoment] = Field(default_factory=list)
     similar_memory: List[SimilarMemoryItem] = Field(default_factory=list)
     final_coaching_summary: str = ""

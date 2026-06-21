@@ -1,22 +1,17 @@
-"""Demo parsing interface + fixture/mock implementations.
+"""Demo parsing interface + fixture/fallback implementations.
 
-The whole MVP is designed to run WITHOUT a real CS2 demo parser installed.
-We define a small `DemoParser` protocol and provide three concrete paths:
+We define a small `DemoParser` protocol with these concrete paths:
 
   1. SampleFixtureParser   -> loads the bundled Mirage fixture.
   2. JsonUploadParser      -> treats an uploaded .json as already-parsed data.
-  3. MockDemParser         -> for uploaded .dem files, returns the sample
-                              fixture but clearly marks parser_mode and seeds
-                              the demo_id from the filename.
+  3. MockDemParser         -> fallback for uploaded .dem files when the real
+                              parser is disabled (USE_MOCK_DEM_PARSER=1) or the
+                              native wheel is unavailable.
 
-TODO(real-parser): Replace MockDemParser with a real parser using either
-  `demoparser2` (https://github.com/LaihoE/demoparser) or `awpy`
-  (https://github.com/pnxenopoulos/awpy). Implement a `RealDemParser` that:
-    - parses ticks/events from the .dem file,
-    - reconstructs per-round GameEvent lists,
-    - computes the PlayerRoundSummary fields (death info, distances,
-      utility usage, rotations, wait times).
-  Keep the ParsedDemo output shape identical so detectors/coach are unchanged.
+Real `.dem` files are decoded for real by `RealDemParser` in
+`app/real_parser.py` (backed by `demoparser2`), which produces the SAME
+`ParsedDemo` shape so the detectors/coach run unchanged. `main.py` routes
+.dem uploads to it by default.
 """
 from __future__ import annotations
 
@@ -62,11 +57,12 @@ class JsonUploadParser:
 
 
 class MockDemParser:
-    """Mock parser for uploaded .dem files.
+    """Fallback parser for uploaded .dem files (real parser disabled).
 
-    We don't actually decode the binary demo here. We return the sample
-    fixture data so the full pipeline still runs, but we clearly mark the
-    parser_mode as "mock_dem_parser" and seed the demo_id from the filename.
+    Used only when USE_MOCK_DEM_PARSER=1 or `demoparser2` can't be installed.
+    It does not decode the binary demo: it returns the sample fixture so the
+    pipeline still runs, clearly marked `parser_mode="mock_dem_parser"` with the
+    demo_id seeded from the filename. The real path is `real_parser.RealDemParser`.
     """
 
     def __init__(self, filename: str, player_id: str = "local_user"):

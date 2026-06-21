@@ -5,7 +5,8 @@ Pipeline:
 """
 from __future__ import annotations
 
-import hashlib
+import os
+import tempfile
 import uuid
 from typing import List
 
@@ -16,6 +17,11 @@ from . import arize_tracing, coach, redis_store
 from .detectors import run_detectors
 from .models import AnalyzeSampleRequest, CoachReport, DecisionMoment, ParsedDemo, SimilarMemoryItem
 from .parser import JsonUploadParser, MockDemParser, SampleFixtureParser
+from .real_parser import DemoParseError, RealDemParser
+
+# Set USE_MOCK_DEM_PARSER=1 to bypass the real demoparser2-backed parser (e.g.
+# in environments where the native wheel is unavailable). Defaults to real.
+_USE_MOCK_DEM = os.environ.get("USE_MOCK_DEM_PARSER", "").lower() in ("1", "true", "yes")
 
 app = FastAPI(title="CS2 Decision Coach", version="0.1.0")
 
@@ -73,6 +79,7 @@ def _run_pipeline(demo: ParsedDemo) -> CoachReport:
         map_name=demo.map,
         moments=moments,
         similar_memory=similar,
+        analyzed_player=demo.analyzed_player,
     )
 
     # 5. Persist report + trace + eval.
@@ -111,8 +118,17 @@ def analyze_sample(req: AnalyzeSampleRequest) -> CoachReport:
 async def analyze_upload(
     file: UploadFile = File(...),
     player_id: str = Form("local_user"),
+    player_name: str = Form(""),
 ) -> CoachReport:
+    """Analyze an uploaded demo.
+
+    * ``.json`` -> treated as already-parsed fixture data.
+    * ``.dem``  -> decoded for real via demoparser2 (RealDemParser). Pass
+      ``player_name`` to choose which player in the demo to coach; otherwise the
+      first player is analyzed.
+    """
     player_id = player_id or "local_user"
+    player_name = (player_name or "").strip()
     filename = file.filename or "upload"
     contents = await file.read()
     lower = filename.lower()
@@ -123,15 +139,61 @@ async def analyze_upload(
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(status_code=400, detail=f"Could not parse uploaded JSON as a parsed demo: {exc}")
     elif lower.endswith(".dem"):
-        # TODO(real-parser): swap MockDemParser for a demoparser2/awpy-backed
-        # RealDemParser that decodes the actual .dem bytes.
-        demo = MockDemParser(filename, player_id=player_id).parse()
+        demo = _parse_dem_upload(contents, filename, player_id, player_name)
     else:
-        # Unknown extension: treat as a .dem-style upload via the mock parser so
-        # we never crash. Mark it clearly.
-        demo = MockDemParser(filename, player_id=player_id).parse()
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported file type. Upload a CS2 .dem file or an already-parsed .json.",
+        )
 
     return _run_pipeline(demo)
+
+
+def _parse_dem_upload(contents: bytes, filename: str, player_id: str, player_name: str) -> ParsedDemo:
+    """Persist the uploaded bytes to a temp .dem and decode it."""
+    if not contents:
+        raise HTTPException(status_code=400, detail="Uploaded .dem file is empty.")
+
+    # CS2 (Source 2) demos start with the magic "PBDEMS2"; CS:GO demos with
+    # "HL2DEMO". Reject obvious non-demos before invoking the native parser.
+    if not contents[:8].startswith((b"PBDEMS2", b"HL2DEMO")):
+        raise HTTPException(
+            status_code=400,
+            detail="That file is not a CS2 demo (missing PBDEMS2 header). Upload a real .dem.",
+        )
+
+    if _USE_MOCK_DEM:
+        return MockDemParser(filename, player_id=player_id).parse()
+
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".dem", delete=False) as tmp:
+            tmp.write(contents)
+            tmp_path = tmp.name
+        safe_name = filename.rsplit("/", 1)[-1].replace(".dem", "") or "uploaded_demo"
+        parser = RealDemParser(
+            tmp_path,
+            player_id=player_id,
+            player_name=player_name or None,
+            demo_id=f"dem_{safe_name}",
+        )
+        return parser.parse()
+    except DemoParseError as exc:
+        raise HTTPException(status_code=400, detail=f"Could not parse .dem file: {exc}")
+    except HTTPException:
+        raise
+    except BaseException as exc:  # noqa: BLE001
+        # Guard against pyo3 PanicException (subclasses BaseException) from the
+        # native parser on truncated/corrupt demos.
+        if isinstance(exc, (KeyboardInterrupt, SystemExit)):
+            raise
+        raise HTTPException(status_code=400, detail=f"Unexpected error parsing .dem file: {exc}")
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
 
 
 @app.get("/api/player/{player_id}/memory")

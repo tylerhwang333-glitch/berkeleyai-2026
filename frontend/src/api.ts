@@ -25,10 +25,16 @@ export async function analyzeSample(playerId: string): Promise<CoachReport> {
   return handle<CoachReport>(res);
 }
 
-export async function analyzeUpload(file: File, playerId: string): Promise<CoachReport> {
+export async function analyzeUpload(
+  file: File,
+  playerId: string,
+  playerName?: string,
+): Promise<CoachReport> {
   const form = new FormData();
   form.append("file", file);
   form.append("player_id", playerId || "local_user");
+  // For real .dem files, picks which player in the demo to coach (optional).
+  if (playerName && playerName.trim()) form.append("player_name", playerName.trim());
   const res = await fetch(`${API_BASE}/api/analyze/upload`, {
     method: "POST",
     body: form,
