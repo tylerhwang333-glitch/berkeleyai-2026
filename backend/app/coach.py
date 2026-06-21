@@ -11,6 +11,7 @@ import os
 from collections import Counter
 from typing import List, Optional, Tuple
 
+from .map_zones import UNKNOWN_ZONE, canonical_zones
 from .models import CoachReport, DecisionMoment, SimilarMemoryItem
 
 MISTAKE_LABELS = {
@@ -113,11 +114,13 @@ def _fallback_summary(
 def _build_structured_prompt(
     moments: List[DecisionMoment],
     similar_memory: List[SimilarMemoryItem],
+    map_name: str = "",
 ) -> Tuple[str, str]:
     counts = _pattern_counts(moments)
     pattern_lines = "\n".join(f"- {MISTAKE_LABELS.get(t, t)}: {n}" for t, n in counts.most_common())
     moment_lines = "\n".join(
-        f"- [{m.mistake_type}] {m.summary_text} | enemy: {m.enemy_action} | you: {m.user_response} "
+        f"- [{m.mistake_type}] {m.summary_text} | zone: {m.zone or UNKNOWN_ZONE} "
+        f"| enemy: {m.enemy_action} | you: {m.user_response} "
         f"| outcome: {m.outcome} | evidence: {'; '.join(m.evidence)}"
         for m in moments
     )
@@ -125,13 +128,22 @@ def _build_structured_prompt(
         f"- [{s.mistake_type}] {s.summary_text} (similarity {s.similarity})" for s in similar_memory
     ) or "- (no prior memory yet)"
 
+    zones = canonical_zones(map_name)
+    zone_vocab = ", ".join(zones) if zones else "(no canonical zones available for this map)"
+
     system = (
         "You are a concise, practical Counter-Strike 2 decision coach. You analyze a player's OWN "
         "demos and tell them what they should have done differently given what the enemy did. "
-        "Be direct and actionable. 4-6 sentences. No fluff, no grades, no scores."
+        "Be direct and actionable. 4-6 sentences. No fluff, no grades, no scores.\n"
+        "MAP LOCATIONS: Only ever refer to map locations using the exact canonical zone labels "
+        "provided in the data. Never invent, rename, or infer a callout. If a moment's zone is "
+        f"\"{UNKNOWN_ZONE}\" (or no zone is given), say \"unknown location\" instead of guessing where "
+        "it happened. Do not derive locations from coordinates -- you are not given any."
     )
     user = (
         "Structured data only (no raw demo). Write a final_coaching_summary.\n\n"
+        f"Map: {map_name or 'unknown'}\n"
+        f"Allowed canonical zones (use ONLY these, or \"unknown location\"): {zone_vocab}\n\n"
         f"Pattern counts:\n{pattern_lines}\n\n"
         f"Detected decision moments:\n{moment_lines}\n\n"
         f"Similar past mistakes from memory:\n{mem_lines}\n"
@@ -142,6 +154,7 @@ def _build_structured_prompt(
 def generate_coach_summary(
     moments: List[DecisionMoment],
     similar_memory: List[SimilarMemoryItem],
+    map_name: str = "",
 ) -> Tuple[str, bool]:
     """Return (summary_text, used_llm)."""
     api_key = os.environ.get("ANTHROPIC_API_KEY")
@@ -152,7 +165,7 @@ def generate_coach_summary(
         import anthropic
 
         client = anthropic.Anthropic(api_key=api_key)
-        system, user = _build_structured_prompt(moments, similar_memory)
+        system, user = _build_structured_prompt(moments, similar_memory, map_name)
         # Default to the latest capable Claude model for hackathon quality.
         model = os.environ.get("ANTHROPIC_MODEL", "claude-opus-4-8")
         resp = client.messages.create(
@@ -178,7 +191,7 @@ def build_report(
     similar_memory: List[SimilarMemoryItem],
     analyzed_player: Optional[str] = None,
 ) -> CoachReport:
-    summary, _used_llm = generate_coach_summary(moments, similar_memory)
+    summary, _used_llm = generate_coach_summary(moments, similar_memory, map_name)
     drills = build_drills(moments)
     return CoachReport(
         report_id=report_id,

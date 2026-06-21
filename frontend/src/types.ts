@@ -5,6 +5,9 @@ export interface DecisionMoment {
   round_id: string;
   map: string;
   side: string;
+  // Canonical map zone resolved deterministically on the backend ("Unknown" if
+  // no nav/coordinate/callout data was available). Never inferred by the LLM.
+  zone?: string | null;
   timestamp_seconds: number;
   enemy_action: string;
   user_response: string;

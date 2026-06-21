@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 from typing import List, Optional
 
+from .map_zones import UNKNOWN_ZONE
 from .models import DecisionMoment, GameEvent, ParsedDemo, RoundFacts
 
 # Thresholds (tweakable hackathon constants)
@@ -24,6 +25,14 @@ USABLE_UTILITY = {"flash", "smoke", "molotov", "incendiary", "he", "grenade"}
 def _moment_id(round_id: str, mistake_type: str, demo_id: str) -> str:
     raw = f"{demo_id}:{round_id}:{mistake_type}"
     return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:16]
+
+
+def _pick_zone(*candidates: Optional[str]) -> str:
+    """First meaningful canonical zone among the candidates, else 'Unknown'."""
+    for c in candidates:
+        if c and c != UNKNOWN_ZONE:
+            return c
+    return UNKNOWN_ZONE
 
 
 def _find_enemy_utility_event(rnd: RoundFacts) -> Optional[GameEvent]:
@@ -51,7 +60,9 @@ def detect_passive_response_to_utility(rnd: RoundFacts, demo_id: str, player_id:
     user_response = f"Player held outside {location} for {waited:.0f}s without taking alternate control"
     outcome = "Lost map control; round stalled into a late/failed action" if rnd.round_winner != rnd.player_team else "Stalled but survived"
 
+    zone = _pick_zone(util_event.zone, summary.primary_zone)
     evidence = [
+        f"Canonical zone: {zone}",
         f"{util_event.event_type.title()} thrown on {location} at {util_event.timestamp_seconds:.0f}s",
         f"Waited {waited:.0f}s near the blocked choke (threshold {PASSIVE_WAIT_SECONDS:.0f}s)",
         "No alternate map-control event recorded this round",
@@ -70,6 +81,7 @@ def detect_passive_response_to_utility(rnd: RoundFacts, demo_id: str, player_id:
         round_id=rnd.round_id,
         map=rnd.map,
         side=rnd.side,
+        zone=zone,
         timestamp_seconds=util_event.timestamp_seconds,
         enemy_action=enemy_action,
         user_response=user_response,
@@ -98,7 +110,9 @@ def detect_isolated_death(rnd: RoundFacts, demo_id: str, player_id: str) -> Opti
     user_response = f"Player engaged {location} alone (~{dist:.0f} units from nearest teammate)"
     outcome = "Died without trade potential; team plays a man down"
 
+    zone = _pick_zone(summary.death_zone, summary.primary_zone)
     evidence = [
+        f"Canonical zone: {zone}",
         f"Death at {summary.death_time_seconds:.0f}s in {location}" if summary.death_time_seconds is not None else f"Died in {location}",
         f"Nearest teammate ~{dist:.0f} units away (threshold {ISOLATED_DISTANCE:.0f})",
         "No flash support before death (untradeable)",
@@ -117,6 +131,7 @@ def detect_isolated_death(rnd: RoundFacts, demo_id: str, player_id: str) -> Opti
         round_id=rnd.round_id,
         map=rnd.map,
         side=rnd.side,
+        zone=zone,
         timestamp_seconds=summary.death_time_seconds or 0.0,
         enemy_action=enemy_action,
         user_response=user_response,
@@ -162,7 +177,9 @@ def detect_early_overrotation(rnd: RoundFacts, demo_id: str, player_id: str) -> 
     )
     outcome = "Original site fell / round lost due to premature rotation"
 
+    zone = _pick_zone(summary.primary_zone, summary.death_zone)
     evidence = [
+        f"Canonical zone: {zone}",
         f"Rotation {summary.rotated_from} -> {summary.rotated_to} at {summary.rotation_time_seconds:.0f}s",
         "No bomb plant confirmed before the rotation",
         "Enemy pressure on the abandoned site" if pressure_after else "Round was lost after the rotation",
@@ -183,6 +200,7 @@ def detect_early_overrotation(rnd: RoundFacts, demo_id: str, player_id: str) -> 
         round_id=rnd.round_id,
         map=rnd.map,
         side=rnd.side,
+        zone=zone,
         timestamp_seconds=summary.rotation_time_seconds,
         enemy_action=enemy_action,
         user_response=user_response,
@@ -209,7 +227,9 @@ def detect_utility_inefficiency(rnd: RoundFacts, demo_id: str, player_id: str) -
     user_response = f"Died in {location} with unused utility: {', '.join(unused)}"
     outcome = "Wasted utility value; weaker duel than necessary"
 
+    zone = _pick_zone(summary.death_zone, summary.primary_zone)
     evidence = [
+        f"Canonical zone: {zone}",
         f"Unused on death: {', '.join(unused)}",
         f"Death in {location}" + (f" at {summary.death_time_seconds:.0f}s" if summary.death_time_seconds is not None else ""),
     ]
@@ -227,6 +247,7 @@ def detect_utility_inefficiency(rnd: RoundFacts, demo_id: str, player_id: str) -
         round_id=rnd.round_id,
         map=rnd.map,
         side=rnd.side,
+        zone=zone,
         timestamp_seconds=summary.death_time_seconds or 0.0,
         enemy_action=enemy_action,
         user_response=user_response,

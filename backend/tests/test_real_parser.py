@@ -18,6 +18,135 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from app.real_parser import RealDemParser, _f, _i, _to_region  # noqa: E402
+from app import map_zones  # noqa: E402
+
+
+# ---------------------------------------------------------------------------
+# Deterministic map-zone resolver
+# ---------------------------------------------------------------------------
+def test_zone_from_callout_maps_to_canonical_labels():
+    z = map_zones.zone_from_callout
+    assert z("de_mirage", "A ramp") == "A Ramp"
+    assert z("de_mirage", "A site") == "A Site"
+    assert z("de_mirage", "BombsiteB") == "B Site"
+    assert z("de_mirage", "Catwalk") == "Catwalk"
+    assert z("de_mirage", "CTSpawn") == "CT Spawn"
+    assert z("de_mirage", "TSpawn") == "T Spawn"
+    # map name without the de_ prefix still resolves
+    assert z("mirage", "Palace") == "Palace"
+    # unknown callout / unknown map / no input -> safe fallback
+    assert z("de_mirage", "SomePlaceThatDoesNotExist") == "Unknown"
+    assert z("de_dust2", "A site") == "Unknown"
+    assert z("de_mirage", None) == "Unknown"
+
+
+def test_resolve_map_zone_falls_back_to_unknown_without_nav_or_regions():
+    # No awpy nav + empty coordinate regions (default) -> Unknown, never raises.
+    assert map_zones.resolve_map_zone("de_mirage", 0.0, 0.0, 0.0) == "Unknown"
+    assert map_zones.resolve_map_zone("de_mirage", None, None) == "Unknown"
+    assert map_zones.resolve_map_zone("de_unsupported", 1.0, 2.0) == "Unknown"
+    # camelCase alias points at the same function
+    assert map_zones.resolveMapZone is map_zones.resolve_map_zone
+
+
+def test_point_in_polygon():
+    square = [(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)]
+    assert map_zones._point_in_polygon(5.0, 5.0, square) is True
+    assert map_zones._point_in_polygon(15.0, 5.0, square) is False
+
+
+def test_coordinate_regions_resolve_a_raw_point():
+    from app.map_data import mirage
+
+    saved = mirage.COORDINATE_REGIONS
+    mirage.COORDINATE_REGIONS = [(-100.0, 100.0, -100.0, 100.0, "A Site")]
+    try:
+        assert map_zones.resolve_map_zone("de_mirage", 0.0, 0.0) == "A Site"
+        assert map_zones.resolve_map_zone("de_mirage", 9999.0, 0.0) == "Unknown"
+    finally:
+        mirage.COORDINATE_REGIONS = saved
+
+
+def test_nav_index_resolves_zone_from_awpy_geometry():
+    """Exercise the awpy 2.0.2 path with a faked Nav (awpy isn't installable on 3.14)."""
+    from dataclasses import dataclass
+
+    from app.map_data import mirage
+
+    @dataclass
+    class V3:
+        x: float
+        y: float
+        z: float
+
+    class FakeArea:
+        def __init__(self, area_id, corners):
+            self.area_id = area_id
+            self.corners = corners
+
+        @property
+        def centroid(self):
+            n = len(self.corners)
+            return V3(
+                sum(c.x for c in self.corners) / n,
+                sum(c.y for c in self.corners) / n,
+                sum(c.z for c in self.corners) / n,
+            )
+
+    class FakeNav:
+        def __init__(self, areas):
+            self.areas = areas
+
+    # One square area centred at (0,0); label it via a temporary coordinate region.
+    area = FakeArea(
+        42, [V3(-10, -10, 64), V3(10, -10, 64), V3(10, 10, 64), V3(-10, 10, 64)]
+    )
+    nav = FakeNav({42: area})
+
+    saved_regions = mirage.COORDINATE_REGIONS
+    map_zones._NAV_CACHE.pop("de_mirage", None)
+    mirage.COORDINATE_REGIONS = [(-50.0, 50.0, -50.0, 50.0, "Connector")]
+    try:
+        # Inject the derived index directly (bypasses the awpy import).
+        map_zones._NAV_CACHE["de_mirage"] = map_zones._build_area_index("de_mirage", nav)
+        # Point inside the area polygon -> area's baked-in zone.
+        assert map_zones._zone_from_nav("de_mirage", 0.0, 0.0, 64.0) == "Connector"
+        # Nav is tried first by the public resolver.
+        assert map_zones.resolve_map_zone("de_mirage", 0.0, 0.0, 64.0) == "Connector"
+        # Far-away point (outside polygon + beyond centroid radius) -> Unknown.
+        assert map_zones._zone_from_nav("de_mirage", 5000.0, 5000.0, 64.0) == "Unknown"
+        # Exact-area-id mapping wins over coordinate regions.
+        saved_ids = mirage.NAV_AREA_ID_TO_ZONE
+        mirage.NAV_AREA_ID_TO_ZONE = {42: "Catwalk"}
+        try:
+            map_zones._NAV_CACHE["de_mirage"] = map_zones._build_area_index("de_mirage", nav)
+            assert map_zones._zone_from_nav("de_mirage", 0.0, 0.0, 64.0) == "Catwalk"
+        finally:
+            mirage.NAV_AREA_ID_TO_ZONE = saved_ids
+    finally:
+        mirage.COORDINATE_REGIONS = saved_regions
+        map_zones._NAV_CACHE.pop("de_mirage", None)
+
+
+def test_resolve_zone_prefers_coords_then_callout():
+    # No coords resolvable -> uses the deterministic callout fallback.
+    assert map_zones.resolve_zone("de_mirage", None, None, None, place="Connector") == "Connector"
+    # Nothing at all -> Unknown.
+    assert map_zones.resolve_zone("de_mirage") == "Unknown"
+
+
+def test_annotate_zones_fills_fixture_from_callouts():
+    from app.sample_data import load_sample_parsed_demo
+
+    demo = load_sample_parsed_demo("local_user")
+    map_zones.annotate_zones(demo)
+    # The bundled Mirage fixture talks about "A ramp" / "A site".
+    zones = {ev.zone for rnd in demo.rounds for ev in rnd.events}
+    assert "A Ramp" in zones or "A Site" in zones
+    for rnd in demo.rounds:
+        # Summary zones are always populated (canonical label or "Unknown").
+        assert rnd.player_summary.death_zone is not None
+        assert rnd.player_summary.primary_zone is not None
 
 
 # ---------------------------------------------------------------------------

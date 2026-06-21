@@ -6,3 +6,8 @@ python-multipart>=0.0.20
 anthropic>=0.42.0
 # Real CS2 .dem parsing (LaihoE/demoparser). Ships native wheels.
 demoparser2>=0.41.0
+# Nav-mesh-backed map-zone resolution (app/map_zones.py). OPTIONAL: requires
+# Python 3.11-3.13. The zone resolver degrades to deterministic callout mapping
+# when awpy or its nav files are absent. Fetch nav meshes once with:
+#     awpy get navs        # downloads <map>.nav into ~/.awpy/navs
+awpy==2.0.2

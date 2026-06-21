@@ -10,6 +10,7 @@ const PARSER_MODE_LABELS: Record<string, string> = {
 };
 
 function MomentCard({ m }: { m: DecisionMoment }) {
+  const hasZone = !!m.zone && m.zone !== "Unknown";
   return (
     <div className="card moment">
       <div className="moment-head">
@@ -18,6 +19,9 @@ function MomentCard({ m }: { m: DecisionMoment }) {
           {m.map} · {m.side} · {m.round_id} · {Math.round(m.timestamp_seconds)}s · conf {m.confidence}
         </span>
       </div>
+      <p className="muted">
+        <strong>Zone:</strong> {hasZone ? m.zone : "map state unavailable"}
+      </p>
       <p><strong>Enemy action:</strong> {m.enemy_action}</p>
       <p><strong>Your response:</strong> {m.user_response}</p>
       <p><strong>Outcome:</strong> {m.outcome}</p>
