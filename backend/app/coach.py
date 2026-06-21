@@ -8,6 +8,7 @@ fallback generator so the app always works offline.
 from __future__ import annotations
 
 import os
+import re
 from collections import Counter
 from typing import List, Optional, Tuple
 
@@ -135,6 +136,8 @@ def _build_structured_prompt(
         "You are a concise, practical Counter-Strike 2 decision coach. You analyze a player's OWN "
         "demos and tell them what they should have done differently given what the enemy did. "
         "Be direct and actionable. 4-6 sentences. No fluff, no grades, no scores.\n"
+        "Write in plain text only. Do NOT use any Markdown formatting -- no **bold**, "
+        "no headings, no bullet points. Do not add a title or heading.\n"
         "MAP LOCATIONS: Only ever refer to map locations using the exact canonical zone labels "
         "provided in the data. Never invent, rename, or infer a callout. If a moment's zone is "
         f"\"{UNKNOWN_ZONE}\" (or no zone is given), say \"unknown location\" instead of guessing where "
@@ -149,6 +152,20 @@ def _build_structured_prompt(
         f"Similar past mistakes from memory:\n{mem_lines}\n"
     )
     return system, user
+
+
+def _strip_markdown(text: str) -> str:
+    """Defensively remove Markdown formatting the LLM might still emit.
+
+    The prompt asks for plain text, but we strip **bold**/__bold__/*italic*
+    emphasis markers and leading heading/bullet markers so the UI renders clean
+    plain text regardless.
+    """
+    # Drop emphasis markers, keeping the wrapped text.
+    text = re.sub(r"(\*\*|__|\*|_)(.+?)\1", r"\2", text)
+    # Strip leading heading (#) and bullet (-, *) markers line by line.
+    lines = [re.sub(r"^\s*(#{1,6}\s+|[-*]\s+)", "", line) for line in text.splitlines()]
+    return "\n".join(lines)
 
 
 def generate_coach_summary(
@@ -175,6 +192,7 @@ def generate_coach_summary(
             messages=[{"role": "user", "content": user}],
         )
         text = "".join(block.text for block in resp.content if getattr(block, "type", None) == "text")
+        text = _strip_markdown(text)
         return text.strip() or _fallback_summary(moments, similar_memory), True
     except Exception as exc:  # noqa: BLE001 - never block MVP on the LLM
         print(f"[coach] Anthropic call failed, using fallback: {exc}")

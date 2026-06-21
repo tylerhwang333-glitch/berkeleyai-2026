@@ -272,8 +272,10 @@ export default function AnalyzeApp() {
             <span className="meta-pill subtle">{report.demo_id}</span>
           </div>
 
-          <div className="card summary">
+          <div className="section-head">
             <h2>Coaching summary</h2>
+          </div>
+          <div className="card summary">
             <p>{report.final_coaching_summary}</p>
           </div>
 
