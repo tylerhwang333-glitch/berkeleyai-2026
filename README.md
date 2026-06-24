@@ -92,8 +92,6 @@ In plain terms: we turn your raw demo into structured facts about the match, run
 
 ## Run it locally
 
-You need three terminals.
-
 **1. Redis** (the coach's memory)
 ```bash
 docker compose up -d redis
@@ -120,7 +118,7 @@ Then open **http://localhost:5173**, upload a demo (or click **Analyze Sample De
 
 ### Configuration
 
-Copy `.env.example` to `.env`. Everything has a sensible default and the AI key is **optional**:
+Copy `.env.example` to `.env`. Everything has a sensible default and the API key is **optional**:
 
 | Variable | Default | Purpose |
 |---|---|---|
