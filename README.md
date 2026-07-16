@@ -2,37 +2,13 @@
 
 <img width="859" height="461" alt="rankup" src="https://github.com/user-attachments/assets/f6a241d9-a787-4a94-a54a-4c5e632db45d" />
 
-**Most Counter-Strike stats tools tell you _what_ happened. rankup.ai tells you what you should have _done_.**
-
-rankup.ai is an AI post-game coach for Counter-Strike 2. You upload one of your own match demos, and instead of another spreadsheet of kills and deaths, you get something a real coach would give you: the specific moments where a decision cost you the round, and the better play you should have made.
+rankup.ai is an AI post-game coach for Counter-Strike 2. Upload one of your own match demos and it finds the specific rounds where a decision cost you — not just another kills/deaths spreadsheet — and tells you what you should have done instead.
 
 It answers one question, round by round:
 
 > **"Given what the enemy did, what should I have done differently?"**
 
----
-
-## What it looks like
-
-For each costly round, rankup.ai breaks down the decision like a coach reviewing the tape with you:
-
-| | |
-|---|---|
-| **Enemy action** | CT smoked A ramp early. |
-| **Your response** | You waited outside A for 28 seconds. |
-| **Outcome** | Your team lost map control and executed late. |
-| **Better decision** | When early A utility stalls you, don't freeze in the choke. Take mid control, reset, or prepare a late split. |
-
-And because it remembers every demo you've ever uploaded, it can tell you when you're making the **same mistake again** — _"this echoes a pattern from your last three matches; fix it first."_
-
----
-
-## Why it's different
-
-- **Decision-focused, not stat-focused.** It coaches judgment — rotations, utility timing, over-commitment — not just aim and K/D.
-- **It's about _you_, not your opponents.** This isn't an enemy-scouting tool. It analyzes your own play and your own recurring habits.
-- **It has a memory.** Every mistake is stored and matched against your history, so coaching gets sharper the more you use it.
-- **It always works.** The full pipeline runs even with no AI key and no database connection — it just gracefully drops to a built-in coach and skips the long-term memory features.
+For each flagged round it shows the enemy action, your response, the outcome, and the better decision. Every analyzed demo is stored in Redis, so it can also flag when you're repeating a mistake across matches.
 
 ---
 
@@ -43,14 +19,14 @@ And because it remembers every demo you've ever uploaded, it can tell you when y
             │
             ▼
    ┌──────────────────┐
-   │      Parser      │   Reads real rounds, deaths, positions,
-   │  (demoparser2)   │   utility usage, bomb plants, map callouts
+   │      Parser      │   Reads rounds, deaths, positions,
+   │  (demoparser2)   │   utility usage, bomb plants
    └────────┬─────────┘
             ▼
    ┌──────────────────┐
-   │     Detectors    │   Flags decision mistakes:
-   │   (rule-based)   │   passive utility response, isolated death,
-   │                  │   early overrotation, utility inefficiency
+   │     Detectors    │   Rule-based checks for passive utility
+   │   (rule-based)   │   response, isolated deaths, early
+   │                  │   overrotation, wasted utility
    └────────┬─────────┘
             ▼
    ┌──────────────────┐     ┌──────────────────────┐
@@ -60,7 +36,7 @@ And because it remembers every demo you've ever uploaded, it can tell you when y
             └───────────┬──────────────┘
                         ▼
               ┌──────────────────┐
-              │      Coach       │   Writes the coaching report
+              │      Coach       │   Writes the coaching summary
               │ (Claude or local │   and practice drills
               │    fallback)     │
               └────────┬─────────┘
@@ -70,33 +46,33 @@ And because it remembers every demo you've ever uploaded, it can tell you when y
               └──────────────────┘
 ```
 
-In plain terms: we turn your raw demo into structured facts about the match, run those facts through detectors that spot bad decisions, check whether you've made similar mistakes before, and hand it all to an AI coach that writes the final feedback and drills.
+The demo is parsed into structured facts, four rule-based detectors flag specific decision mistakes, Redis is checked for similar past mistakes by the same player, and a coach step (Claude if an API key is set, otherwise a deterministic local generator) writes the final summary and drills. The whole pipeline runs even without Redis or an API key — it just skips the memory/pattern features and falls back to the local coach.
 
 ---
 
 ## Tech stack
 
-| Layer | Technology | What it does for us |
-|---|---|---|
-| **Frontend** | React 18 + TypeScript, built with Vite 6 | The single-page web app where you upload a demo and read your coaching report. |
-| **Backend** | Python + FastAPI (Uvicorn server) | The analysis pipeline and REST API tying everything together. |
-| **Data models** | Pydantic v2 | Type-safe, validated data flowing through every pipeline stage. |
-| **Demo parsing** | `demoparser2` | Parses real CS2 `.dem` files into rounds, deaths, utility, and positions. |
-| **Map intelligence** | `awpy` (nav meshes) | Resolves player positions into real map callouts; falls back gracefully if unavailable. |
-| **Memory & retrieval** | Redis (RediSearch vector index) | Stores every decision moment and finds recurring mistakes by similarity — the coach's long-term memory. |
-| **AI coaching** | Anthropic Claude (Opus 4.8) | Writes the natural-language coaching summary and drills. Optional — a deterministic local coach covers it if no key is set. |
-| **Observability** | Arize-style tracing + groundedness eval | Traces each pipeline stage and sanity-checks the coach's output for trustworthiness. |
-| **Deployment** | Docker Compose (backend + nginx-served frontend) | One-command containerized deploy; talks to managed cloud Redis. |
+| Layer | Technology |
+|---|---|
+| **Frontend** | React 18 + TypeScript, built with Vite 6 |
+| **Backend** | Python + FastAPI (Uvicorn) |
+| **Data models** | Pydantic v2 |
+| **Demo parsing** | `demoparser2` (real CS2 `.dem` files) |
+| **Map zones** | Deterministic coordinate/callout resolver, optionally backed by `awpy` nav meshes. Currently only Mirage has canonical zone data. |
+| **Memory & retrieval** | Redis (RediSearch vector index when available, brute-force cosine fallback otherwise) over a simple local hashed-text embedding — no external embedding API |
+| **AI coaching** | Anthropic Claude (optional — a deterministic local coach is used if no `ANTHROPIC_API_KEY` is set) |
+| **Observability** | Console-logged pipeline traces + a heuristic groundedness check on the coach's output |
+| **Deployment** | Docker Compose (backend + nginx-served frontend), talking to a managed cloud Redis |
 
 ---
 
 ## Run it locally
 
-**1. Redis** (the coach's memory)
+**1. Redis** (optional — the coach's memory)
 ```bash
 docker compose up -d redis
 ```
-> The app still runs if Redis is down — it just skips memory and recurring-pattern features.
+> The app still runs if Redis is down; it just skips memory and recurring-pattern features.
 
 **2. Backend**
 ```bash
@@ -114,11 +90,11 @@ npm install
 npm run dev
 ```
 
-Then open **http://localhost:5173**, upload a demo (or click **Analyze Sample Demo**), and read your report.
+Then open **http://localhost:5173** and upload a `.dem` or already-parsed `.json` demo.
 
 ### Configuration
 
-Copy `.env.example` to `.env`. Everything has a sensible default and the API key is **optional**:
+Set these as environment variables (or in a `.env` file the backend/Docker Compose can read). Everything has a sensible default and the API key is **optional**:
 
 | Variable | Default | Purpose |
 |---|---|---|
@@ -140,9 +116,11 @@ Copy `.env.example` to `.env`. Everything has a sensible default and the API key
 
 ---
 
-## Where we're headed
+## Possible improvements
 
-- Map-specific coaching knowledge (callouts and timings tuned per map).
+- Map-specific coaching knowledge for maps beyond Mirage.
+- More accurate map positioning knowledge.
+- More detailed rule based detectors.
 - Positional heatmaps from parsed tick data.
 - Direct FACEIT / share-code demo import — paste a code instead of a file.
 - Richer UI: round timelines and filters.
