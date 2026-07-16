@@ -1,8 +1,8 @@
-# rankup.ai — CS2 Decision Coach
+# Rankup
 
 <img width="859" height="461" alt="rankup" src="https://github.com/user-attachments/assets/f6a241d9-a787-4a94-a54a-4c5e632db45d" />
 
-rankup.ai is an AI post-game coach for Counter-Strike 2. Upload one of your own match demos and it finds the specific rounds where a decision cost you — not just another kills/deaths spreadsheet — and tells you what you should have done instead.
+Rankup is an AI post-game coach for Counter-Strike 2. Upload one of your own match demos and it finds the specific rounds where a decision cost you — not just another kills/deaths spreadsheet — and tells you what you should have done instead.
 
 It answers one question, round by round:
 
